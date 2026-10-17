@@ -8,6 +8,8 @@
 |---|---|---|
 | Z-Image Turbo | Apache-2.0 | |
 | Qwen-Image-2512 + Lightning LoRA | Apache-2.0 | |
+| Qwen-Image-Edit-2511 | Apache-2.0 | 2026-10-17 공식 Qwen 모델 카드와 Comfy-Org FP8 배포 라이선스 확인. 인물 참조 이미지 편집용. https://huggingface.co/Qwen/Qwen-Image-Edit-2511 |
+| Qwen-Image-Edit-2511-Lightning 4steps V1.0 LoRA | Apache-2.0 | 2026-10-17 제작자 배포 라이선스 확인. 2511 편집 모델 전용이며 기존 2512 LoRA와 구분. https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning |
 | Krea 2 Turbo | Krea 2 Community | 연 매출 $1M 미만, 50석 미만 조건 |
 | ACE-Step 1.5 | MIT | 오디오/음악 |
 | MiniMax H3 | 이메일 신청으로 상업 사용 허가 받음 (2026-09-29) | 라이선스 본문은 한국 제외이나 사용자가 별도 허가를 받았으므로 **사용 가능** |
