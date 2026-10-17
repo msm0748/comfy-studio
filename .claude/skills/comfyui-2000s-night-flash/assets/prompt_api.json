@@ -1,0 +1,111 @@
+{
+  "28": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "30": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    }
+  },
+  "29": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "27": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "An adult Korean woman aged 27, shoulder length dark brown hair with wispy bangs, natural face, minimal makeup, understated everyday early 2000s clothing. Wearing a muted dusty blue zip cardigan and jeans, standing outside a small neighborhood convenience store at night, holding a small milk carton in one hand, glancing toward the camera with a faint shy smile. Medium waist up snapshot. Direct on camera compact camera flash, slightly harsh light on face, darker background with softly glowing storefront, understated everyday street scene. Candid photograph taken in 2003 using a small consumer 3 megapixel CCD compact digital camera, nostalgic Korean personal photo album. Ordinary imperfect snapshot rather than polished fashion photography. Soft low resolution detail, slight focus imprecision, visible fine chroma noise in shadows, mild JPEG compression texture, limited dynamic range, slightly blown pale highlights, modest saturation, subtle yellow green white balance cast, soft brown and olive shadows, warm skin, small camera lens, authentic dated digital photo quality. Natural unretouched skin, wistful quiet mood, believable anatomy. Horizontal 4:3 snapshot. No text, no date stamp, no watermarks, no decorative frame.",
+      "clip": [
+        "30",
+        0
+      ]
+    }
+  },
+  "33": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "27",
+        0
+      ]
+    }
+  },
+  "13": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 768,
+      "batch_size": 1
+    }
+  },
+  "11": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "28",
+        0
+      ],
+      "shift": 3,
+      "sampling": "flow"
+    }
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "11",
+        0
+      ],
+      "positive": [
+        "27",
+        0
+      ],
+      "negative": [
+        "33",
+        0
+      ],
+      "latent_image": [
+        "13",
+        0
+      ],
+      "seed": 2026100354,
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "denoise": 1
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ],
+      "filename_prefix": "early_2000s_heroines/04_street"
+    }
+  }
+}

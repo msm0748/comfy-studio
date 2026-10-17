@@ -1,0 +1,29 @@
+[START] Security scan
+[DONE] Security scan
+## ComfyUI-Manager: installing dependencies done.
+** ComfyUI startup time: 2026-10-17 12:31:58.528
+** Platform: Windows
+** Python version: 3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+** Python executable: C:\ComfyUI\ComfyUI_windows_portable\python_embeded\python.exe
+** ComfyUI Path: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI
+** ComfyUI Base Folder Path: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI
+** User directory: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI\user
+** ComfyUI-Manager config path: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI\user\__manager\config.ini
+** Log path: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI\user\comfyui.log
+[Crystools [0;32mINFO[0m] Crystools version: 1.27.4
+[Crystools [0;32mINFO[0m] Platform release: 11
+[Crystools [0;32mINFO[0m] JETSON: Not detected.
+[Crystools [0;32mINFO[0m] CPU: AMD Ryzen 5 5600X 6-Core Processor - Arch: AMD64 - OS: Windows 11
+[Crystools [0;32mINFO[0m] pynvml (NVIDIA) initialized.
+[Crystools [0;32mINFO[0m] GPU/s:
+[Crystools [0;32mINFO[0m] 0) NVIDIA GeForce RTX 3090
+[Crystools [0;32mINFO[0m] NVIDIA Driver: 617.14
+Module 'diffusers' load failed. If you don't have it installed, do it:
+pip install diffusers
+[ComfyUI-Easy-Use] server: v1.4.1 Loaded
+[ComfyUI-Easy-Use] web root: C:\ComfyUI\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI-Easy-Use\web_version/v2 Loaded
+
+[rgthree-comfy] Loaded 48 exciting nodes. ŸŽ
+
+[rgthree-comfy] ComfyUI's new Node 2.0 rendering may be incompatible with some rgthree-comfy nodes and features, breaking some rendering as well as losing the ability to access a node's properties (a vital part of many nodes). It also appears to run MUCH more slowly spiking CPU usage and causing jankiness and unresponsiveness, especially with large workflows. Personally I am not planning to use the new Nodes 2.0 and, unfortunately, am not able to invest the time to investigate and overhaul rgthree-comfy where needed. If you have issues when Nodes 2.0 is enabled, I'd urge you to switch it off as well and join me in hoping ComfyUI is not planning to deprecate the existing, stable canvas rendering all together.
+

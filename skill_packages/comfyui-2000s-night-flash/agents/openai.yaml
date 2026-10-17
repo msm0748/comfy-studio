@@ -1,0 +1,4 @@
+interface:
+  display_name: "2000년대 밤거리 디카 플래시"
+  short_description: "ComfyUI에서 직광 플래시와 옛 CCD 디카 질감의 밤거리 스냅사진 생성"
+  default_prompt: "$comfyui-2000s-night-flash 스타일로 밤거리에서 찍은 여자 주인공 사진 한 장 만들어줘."
