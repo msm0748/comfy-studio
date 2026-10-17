@@ -31,6 +31,9 @@ test('reference storage rejects oversize, excessive pixels, animated, unsupporte
     await assert.rejects(()=>refs.create(Buffer.from('broken')),{status:400});
     const gif=await sharp({create:{width:2,height:2,channels:3,background:'white'}}).gif().toBuffer();
     await assert.rejects(()=>refs.create(gif),{status:400});
+    const animated=await sharp(Buffer.concat([Buffer.alloc(12,255),Buffer.alloc(12)]),{raw:{width:2,height:4,channels:3,pageHeight:2}}).webp({loop:0,delay:[100,100]}).toBuffer();
+    assert.equal((await sharp(animated).metadata()).pages,2);
+    await assert.rejects(()=>refs.create(animated),{status:400});
     const png=await sharp({create:{width:2,height:2,channels:3,background:'white'}}).png().toBuffer();
     await assert.rejects(()=>refs.create(png.subarray(0,40)),{status:400});
     assert.equal((await fs.readdir(directory)).length,0);

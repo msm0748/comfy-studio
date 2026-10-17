@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GenerationInput, JobRecord, ModelId, ModelOption, SizeId } from '@/lib/types';
+import type { GenerationInput, JobRecord, ModelId, ModelOption, SizeId, ReferenceRecord,StudioMode } from '@/lib/types';
+import { getPreset } from '@/lib/presets';
+import { restoreEditorState } from '@/lib/editor-state';
+import { validateGenerationInput } from '@/lib/validation';
 import { HttpError, canGenerate, createPendingJob, disableModels, isActiveJob, restorePendingJob, submitOrRecover } from '@/lib/submission';
 import { StudioNav } from './studio-nav';
 import { GenerationForm } from './generation-form';
@@ -33,16 +36,25 @@ export function Studio() {
   const [modelId, setModelId] = useState<ModelId>('z-image');
   const [sizeId, setSizeId] = useState<SizeId>('square');
   const [prompt, setPrompt] = useState('');
+  const [editPrompt,setEditPrompt]=useState('');
+  const [reference,setReference]=useState<ReferenceRecord|null>(null);
+  const [referenceBusy,setReferenceBusy]=useState(false);
+  const [referenceError,setReferenceError]=useState('');
+  const [preserveIdentity,setPreserveIdentity]=useState(true);
+  const referenceRequest=useRef(0);
+  const referenceController=useRef<AbortController|null>(null);
+  const generationModel=useRef<ModelId>('z-image');
+  const mode=getPreset(modelId).mode;
   const [job, setJob] = useState<JobRecord | null>(null);
   const [result, setResult] = useState<JobRecord | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [elapsed, setElapsed] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState<{src:string;alt:string}|null>(null);
   const submitLock = useRef(false);
   const promptRef = useRef<HTMLDivElement>(null);
-  const busy = submitting || restoring || isActiveJob(job);
+  const busy = submitting || restoring || referenceBusy || isActiveJob(job);
 
   const accept = useCallback((next: JobRecord) => {
     setJob(next);
@@ -67,10 +79,20 @@ export function Studio() {
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  const restoreForm=useCallback(async(input:GenerationInput,signal?:AbortSignal)=>{
+    const state=await restoreEditorState(input,async id=>(await json<{reference:ReferenceRecord}>(`/api/references/${id}`,{signal})).reference);
+    if(signal?.aborted)return;
+    setModelId(state.input.modelId);setSizeId(state.input.sizeId);setPreserveIdentity(state.input.preserveIdentity!==false);
+    if(getPreset(state.input.modelId).mode==='edit')setEditPrompt(state.input.prompt);else setPrompt(state.input.prompt);
+    setReference(state.reference);setReferenceError(state.referenceError);
+  },[]);
+
+  useEffect(() => { const timer=setTimeout(()=>void refresh(),0);return()=>clearTimeout(timer); }, [refresh]);
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+    queueMicrotask(()=>{
+    if(cancelled)return;
     const previous = localStorage.getItem('comfy-studio-result');
     const current = localStorage.getItem('comfy-studio-job');
     if (previous) {
@@ -81,22 +103,26 @@ export function Studio() {
           }
         }).catch(() => {});
     }
-    if (!current) { setRestoring(false); return () => controller.abort(); }
+    if (!current) { setRestoring(false); return; }
     let pending: JobRecord | null = null;
     try {
       const cached = JSON.parse(localStorage.getItem('comfy-studio-pending') || 'null') as JobRecord | null;
-      if (cached?.id === current && isActiveJob(cached)) pending = cached;
+      if (cached?.id === current && isActiveJob(cached)) pending = {...cached,input:validateGenerationInput(cached.input)};
     } catch { /* A damaged local draft is recovered from the server instead. */ }
     if (pending) {
       setJob(pending);
       setModelId(pending.input.modelId);
       setSizeId(pending.input.sizeId);
-      setPrompt(pending.input.prompt);
+      if(getPreset(pending.input.modelId).mode==='edit')setEditPrompt(pending.input.prompt);else setPrompt(pending.input.prompt);
+      setPreserveIdentity(pending.input.preserveIdentity!==false);
     }
     const lookup = (id: string) => json<JobRecord>('/api/generations/' + encodeURIComponent(id), { signal: controller.signal });
     const recovery = pending ? restorePendingJob(pending, lookup) : lookup(current);
-    void recovery.then(value => {
-      if (!cancelled) { accept(value); setRestoring(false); }
+    void recovery.then(async value => {
+      if(cancelled)return;
+      accept(value);
+      await restoreForm(value.input,controller.signal);
+      if (!cancelled) setRestoring(false);
     }).catch(cause => {
       if (cancelled) return;
       if (cause instanceof HttpError && cause.status === 404) {
@@ -105,8 +131,9 @@ export function Studio() {
       }
       setError('이전 작업의 상태를 확인하지 못했습니다. 연결 확인 및 요청 복구를 눌러주세요.');
     });
+    });
     return () => { cancelled = true; controller.abort(); };
-  }, [accept]);
+  }, [accept,restoreForm]);
 
   useEffect(() => {
     if (!job || !isActiveJob(job)) return;
@@ -156,27 +183,57 @@ export function Studio() {
   }
 
   async function reconnect() {
+    setRestoring(true);
     await refresh();
     const id = localStorage.getItem('comfy-studio-job');
     if (!id) { setRestoring(false); return; }
-    try { accept(await readJob(id)); setRestoring(false); }
+    try { const recovered=await readJob(id);accept(recovered);await restoreForm(recovered.input); }
     catch (cause) {
       // Explicit recovery reuses the same ID; it never starts a fresh copy of an ambiguous request.
       if (cause instanceof HttpError && cause.status === 404 && job?.state === 'submitting' && job.id === id) {
-        accept(await submitOrRecover(job, sendJob, readJob));
-        setRestoring(false);
+        const recovered=await submitOrRecover(job, sendJob, readJob);accept(recovered);await restoreForm(recovered.input);
       } else {
         setConnected(false);
         setError(cause instanceof Error ? cause.message : '상태를 확인하지 못했습니다.');
       }
-    }
+    }finally{setRestoring(false);}
   }
 
   function chooseIdea(value: string) {
-    setPrompt(value);
+    if(mode==='edit')setEditPrompt(value);else setPrompt(value);
     promptRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
     if (window.innerWidth < 800) promptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  function changeMode(next:StudioMode){
+    if(busy)return;
+    if(mode==='generate')generationModel.current=modelId;
+    setModelId(next==='edit'?'qwen-edit-2511':generationModel.current);setSizeId('square');
+  }
+  async function prepareReference(source:File|JobRecord){
+    if(busy)return;
+    if(source instanceof File&&source.size>10*1024*1024){setReferenceError('이미지는 10MB 이하로 선택해 주세요.');return;}
+    const requestId=++referenceRequest.current;referenceController.current?.abort();
+    const controller=new AbortController();referenceController.current=controller;
+    setReferenceBusy(true);setReferenceError('');
+    if(!(source instanceof File)){
+      if(mode==='generate')generationModel.current=modelId;
+      setModelId('qwen-edit-2511');setEditPrompt('');setPreserveIdentity(true);
+    }
+    try{
+      let body:BodyInit;let headers:HeadersInit|undefined;
+      if(source instanceof File){const form=new FormData();form.set('image',source);body=form;}
+      else{body=JSON.stringify({sourceJobId:source.id,index:0});headers={'Content-Type':'application/json'};}
+      const data=await json<{reference:ReferenceRecord}>('/api/references',{method:'POST',body,headers,signal:AbortSignal.any([controller.signal,AbortSignal.timeout(60000)])});
+      if(requestId!==referenceRequest.current)return;
+      setReference(data.reference);if(mode==='generate')generationModel.current=modelId;
+      setModelId('qwen-edit-2511');setSizeId('square');
+      promptRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      requestAnimationFrame(()=>promptRef.current?.querySelector('textarea')?.focus({preventScroll:true}));
+    }catch(cause){if(requestId===referenceRequest.current&&!controller.signal.aborted)setReferenceError(cause instanceof Error?cause.message:'참조 이미지를 준비하지 못했습니다.');}
+    finally{if(requestId===referenceRequest.current)setReferenceBusy(false);}
+  }
+  function removeReference(){referenceRequest.current++;referenceController.current?.abort();setReference(null);setReferenceError('');setReferenceBusy(false);}
 
   return <>
     <StudioNav connected={connected} />
@@ -193,17 +250,20 @@ export function Studio() {
         </div>
         <div className="workspace">
           <div ref={promptRef}>
-            <GenerationForm models={models} modelId={modelId} sizeId={sizeId} prompt={prompt} busy={busy}
+            <GenerationForm models={models} modelId={modelId} sizeId={sizeId} prompt={mode==='edit'?editPrompt:prompt} busy={busy}
+              mode={mode} onMode={changeMode} reference={reference} referenceBusy={referenceBusy} referenceError={referenceError}
+              onReference={file=>void prepareReference(file)} onRemoveReference={removeReference} preserveIdentity={preserveIdentity} onPreserveIdentity={setPreserveIdentity} onPreview={(src,alt)=>setExpanded({src,alt})}
+              onReferenceRetry={reconnect} canRetryReference={!!job?.input.referenceId&&!reference}
               connected={connected} onModel={value => { setModelId(value); setSizeId('square'); }}
-              onSize={setSizeId} onPrompt={setPrompt} onSubmit={submit} onRefresh={refresh} />
+              onSize={setSizeId} onPrompt={mode==='edit'?setEditPrompt:setPrompt} onSubmit={submit} onRefresh={refresh} />
           </div>
-          <GenerationResult job={job} result={result} elapsed={elapsed} error={error} onIdea={chooseIdea}
-            onExpand={() => setExpanded(true)} onReconnect={reconnect} busy={busy} />
+          <GenerationResult key={result?.id??'empty'} job={job} result={result} elapsed={elapsed} error={error} onIdea={chooseIdea}
+            onExpand={(src,alt) => setExpanded({src,alt})} onContinue={value=>void prepareReference(value)} mode={mode} onReconnect={reconnect} busy={busy} />
         </div>
         <footer className="studio-footer"><span>LESS SETUP. MORE IMAGINATION.</span>
           <span>나만의 크리에이티브 스튜디오 <span className="footer-dot">✦</span></span></footer>
       </main>
     </div>
-    {expanded && result && <ImageLightbox result={result} onClose={() => setExpanded(false)} />}
+    {expanded && <ImageLightbox src={expanded.src} alt={expanded.alt} onClose={() => setExpanded(null)} />}
   </>;
 }

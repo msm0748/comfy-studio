@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { getPreset, listPresetDefinitions } from './presets.ts';
 import { compileWorkflow, loadWorkflow } from './workflow.ts';
-import { createJobService, normalizeHistory, ServiceError, validateGraphModels } from './jobs.ts';
+import { createJobService, normalizeHistory, ServiceError, PreparationError, validateGraphModels } from './jobs.ts';
 import { compileEditWorkflow,loadEditWorkflow } from './edit-workflow.ts';
 import { references } from './reference-images.ts';
 import type { ApiGraph, GenerationInput, ImageRef, ModelOption, NodeInfo } from './types.ts';
@@ -38,8 +38,9 @@ export async function getModelOptions():Promise<{connected:boolean;models:ModelO
   return {connected:true,models};
 }
 async function submit(input:GenerationInput,id:string) {
-  const filename=input.referenceId?await uploadReference(input.referenceId):undefined;
-  const prompt=await prepared(input,undefined,filename);
+  let prompt:ApiGraph;
+  try{const filename=input.referenceId?await uploadReference(input.referenceId):undefined;prompt=await prepared(input,undefined,filename);}
+  catch(error){throw new PreparationError(error instanceof ServiceError?error.message:'생성 준비를 완료하지 못했습니다. 참조 이미지와 모델 상태를 확인한 뒤 다시 시도해 주세요.');}
   const data=await (await request('/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,client_id:id,extra_data:{comfy_studio_job_id:id}})})).json();
   if(typeof data.prompt_id!=='string')throw new ServiceError('ComfyUI가 작업 번호를 반환하지 않았습니다.');
   return data.prompt_id as string;
