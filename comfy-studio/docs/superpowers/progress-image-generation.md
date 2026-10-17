@@ -15,3 +15,9 @@ Task 5: verification in progress — UI generated a real Z-Image 1024×1024 PNG 
 Responsive QA: 320, 390 and 768 px content widths match viewport widths, no horizontal overflow. The failing mobile canvas ratio/min-height interaction was reproduced and corrected with explicit width constraints.
 Ruling: Windows Tailwind-specific loader failed even outside the sandbox; use standard CSS and the default Turbopack CSS pipeline. Cost if wrong: future Tailwind utility work needs loader re-evaluation.
 Ruling: Next.js normalizes the internal request URL; same-origin validation uses the actual Host header instead. Both same-host acceptance and cross-site rejection are covered by a regression test. Cost if wrong: a future reverse-proxy deployment must preserve the original Host correctly.
+Final review: independent fresh reviewer found three Important issues and no Critical issues.
+Final: fixed ambiguous POST/restore recovery — submit identity and input persist before POST; pending state survives response failure; recovery never creates a fresh ID. submission tests RED→GREEN.
+Final: fixed accepted-job metadata failure — separate submission from persistence, retry persistence, retain accepted prompt in memory, recover by ComfyUI extra_data after restart. metadata replacement regression RED→GREEN.
+Final: fixed stale availability — failed refresh disables models; generation requires confirmed connectivity; model API checks live health even when schemas are cached. availability regression RED→GREEN.
+Deferred minors: none reported.
+Task 5: complete — final 18/18 tests, TypeScript and production build passed after review fixes; no Critical or Important findings remain. No merge or external deployment performed. Existing local preview remains available on 127.0.0.1:3001.

@@ -54,11 +54,15 @@ type Dependencies = {
   submit:(input:GenerationInput,id:string)=>Promise<string>;
   inspect:(promptId:string)=>Promise<Inspection>;
   image:(image:ImageRef)=>Promise<Response>;
+  recover?:(id:string)=>Promise<string|null>;
 };
 export function createJobService(deps:Dependencies) {
   const locks=new Map<string,Promise<JobRecord>>();
+  const unpersisted=new Map<string,JobRecord>();
   const location=(id:string)=>{assertJobId(id);return path.join(deps.directory,id+'.json');};
   async function read(id:string):Promise<JobRecord> {
+    assertJobId(id);
+    if(unpersisted.has(id))return unpersisted.get(id)!;
     try {return JSON.parse(await readFile(location(id),'utf8')) as JobRecord;}
     catch(error) {if((error as NodeJS.ErrnoException).code==='ENOENT')throw new ServiceError('작업을 찾을 수 없습니다.',404);throw error;}
   }
@@ -67,6 +71,14 @@ export function createJobService(deps:Dependencies) {
     const temp=destination+'.'+randomUUID()+'.tmp';
     await writeFile(temp,JSON.stringify(job),'utf8');
     await rename(temp,destination);
+  }
+  async function preserveAccepted(job:JobRecord) {
+    unpersisted.set(job.id,job);
+    for(let attempt=0;attempt<2;attempt++) {
+      try{await save(job);unpersisted.delete(job.id);return;}
+      catch(error){console.error('[ComfyStudio metadata persistence]',error);}
+    }
+    // Keep the accepted prompt recoverable in memory; recovery by studio ID also survives a restart.
   }
   async function locked(id:string,operation:()=>Promise<JobRecord>) {
     assertJobId(id);
@@ -90,23 +102,28 @@ export function createJobService(deps:Dependencies) {
           if(JSON.stringify(job.input)!==JSON.stringify(input))throw new ServiceError('같은 작업 번호로 다른 요청을 보낼 수 없습니다.',409);
           return job;
         }
-        try {
-          const promptId=await deps.submit(input,id);
-          job={...job,promptId,state:'queued'};
-          await save(job);
-          return job;
-        } catch(error) {
+        let promptId:string;
+        try {promptId=await deps.submit(input,id);}
+        catch(error) {
           console.error('[ComfyStudio submit]',error);
-          job={...job,state:'failed',error:error instanceof ServiceError?error.message:'생성 요청을 확인하지 못했습니다. 같은 작업을 자동으로 다시 제출하지 않습니다.'};
+          const rejected=error instanceof ServiceError&&error.status>=400&&error.status<500;
+          job={...job,state:rejected?'failed':'submitting',error:error instanceof ServiceError?error.message:'생성 요청의 접수 상태를 확인하고 있습니다. 같은 작업을 새로 제출하지 않습니다.'};
           await save(job);
           return job;
         }
+        job={...job,promptId,state:'queued'};
+        await preserveAccepted(job);
+        return job;
       });
     },
     async getGeneration(id:string):Promise<JobRecord> {
       return locked(id,async()=>{
-        const job=await read(id);
+        let job=await read(id);
         if(['completed','failed'].includes(job.state))return job;
+        if(!job.promptId) {
+          const recovered=await deps.recover?.(id);
+          if(recovered)job={...job,promptId:recovered,state:'queued',error:undefined};
+        }
         if(!job.promptId) {
           if(Date.now()-Date.parse(job.createdAt)>90000) {
             const failed:JobRecord={...job,state:'failed',error:'요청 접수 상태를 확인하지 못했습니다. ComfyUI에서 큐 상태를 확인해 주세요.'};
@@ -115,7 +132,7 @@ export function createJobService(deps:Dependencies) {
           return job;
         }
         const inspection=await deps.inspect(job.promptId);
-        const updated={...job,...inspection}; await save(updated);return updated;
+        const updated={...job,...inspection,error:inspection.error};await preserveAccepted(updated);return updated;
       });
     },
     async getGenerationImage(id:string,index:number):Promise<Response> {

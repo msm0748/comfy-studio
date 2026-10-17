@@ -9,7 +9,7 @@ async function request(route:string,options:RequestInit={}) {
   let response:Response;
   try {response=await fetch(base()+route,{...options,cache:'no-store',signal:AbortSignal.timeout(15000)});}
   catch(error) {console.error('[ComfyUI connection]',error);throw new ServiceError('ComfyUI에 연결할 수 없습니다. PC의 ComfyUI 실행 상태를 확인해 주세요.');}
-  if(!response.ok) {console.error('[ComfyUI response]',route,response.status,await response.text());throw new ServiceError('ComfyUI가 요청을 처리하지 못했습니다. 저장된 워크플로를 확인해 주세요.');}
+  if(!response.ok) {console.error('[ComfyUI response]',route,response.status,await response.text());throw new ServiceError('ComfyUI가 요청을 처리하지 못했습니다. 저장된 워크플로를 확인해 주세요.',response.status>=400&&response.status<500?400:503);}
   return response;
 }
 let schemaCache:{expires:number;value:NodeInfo}|undefined;
@@ -27,7 +27,7 @@ async function prepared(input:GenerationInput,info?:NodeInfo):Promise<ApiGraph> 
 export async function getModelOptions():Promise<{connected:boolean;models:ModelOption[]}> {
   const presets=listPresetDefinitions();
   let info:NodeInfo;
-  try{info=await nodeInfo();}catch{return {connected:false,models:presets.map(p=>({...p,available:false,reason:'ComfyUI 연결을 확인해 주세요.'}))};}
+  try{await request('/system_stats');info=await nodeInfo();}catch{return {connected:false,models:presets.map(p=>({...p,available:false,reason:'ComfyUI 연결을 확인해 주세요.'}))};}
   const models=await Promise.all(presets.map(async preset=>{
     try {await prepared({modelId:preset.id,prompt:'availability check',sizeId:'square'},info);return {...preset,available:true};}
     catch(error){console.error('[ComfyStudio preset]',preset.id,error);return {...preset,available:false,reason:error instanceof Error?error.message:'워크플로를 확인해 주세요.'};}
@@ -57,7 +57,15 @@ async function image(ref:ImageRef) {
   if(!response.headers.get('content-type')?.startsWith('image/'))throw new ServiceError('이미지 응답을 확인할 수 없습니다.');
   return new Response(response.body,{headers:{'Content-Type':response.headers.get('content-type')!,'Cache-Control':'no-store','Content-Disposition':`inline; filename="${ref.filename.replace(/[^a-zA-Z0-9_.-]/g,'_')}"`,'X-Content-Type-Options':'nosniff'}});
 }
-const service=createJobService({directory:path.join(process.cwd(),'.data','jobs'),submit,inspect,image});
+async function recover(id:string):Promise<string|null> {
+  const queue=await (await request('/queue')).json() as {queue_running:unknown[][];queue_pending:unknown[][]};
+  const match=[...queue.queue_running,...queue.queue_pending].find(row=>(row[3] as Record<string,unknown>)?.comfy_studio_job_id===id);
+  if(match&&typeof match[1]==='string')return match[1];
+  const history=await (await request('/history?max_items=100')).json() as Record<string,{prompt?:unknown[]}>;
+  const entry=Object.entries(history).find(([,value])=>(value.prompt?.[3] as Record<string,unknown>)?.comfy_studio_job_id===id);
+  return entry?.[0] || null;
+}
+const service=createJobService({directory:path.join(process.cwd(),'.data','jobs'),submit,inspect,image,recover});
 export const submitGeneration=service.submitGeneration;
 export const getGeneration=service.getGeneration;
 export const getGenerationImage=service.getGenerationImage;

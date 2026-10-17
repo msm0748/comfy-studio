@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { createJobService, normalizeHistory, validateGraphModels } from '../lib/jobs.ts';
 import type { GenerationInput, NodeInfo } from '../lib/types.ts';
 const input:GenerationInput={modelId:'z-image',prompt:'a red chair',sizeId:'square'};
@@ -48,4 +50,18 @@ test('history errors and dangerous image paths are rejected rather than exposed'
 test('missing installed models disable a graph even when the loader node exists', () => {
   const info:NodeInfo={UNETLoader:{input:{required:{unet_name:[['installed.safetensors']]}}}};
   assert.throws(()=>validateGraphModels({'1':{class_type:'UNETLoader',inputs:{unet_name:'missing.safetensors'}}},info));
+});
+test('a metadata replace failure after acceptance preserves a recoverable queued job',async t=>{
+  const directory=await mkdtemp(path.join(tempRoot,'comfy-jobs-'));
+  const rename=fs.rename;let fail=true;let submits=0;
+  t.mock.method(fs,'rename',async(...args:Parameters<typeof rename>)=>{if(fail){fail=false;throw Object.assign(new Error('file temporarily locked'),{code:'EPERM'});}return rename(...args);});
+  syncBuiltinESMExports();
+  try {
+    const deps={directory,submit:async()=>{submits++;return 'accepted-prompt';},inspect:async()=>({state:'completed' as const,images:[{filename:'result.png',subfolder:'',type:'output' as const}]}),image:async()=>new Response('image')};
+    const service=createJobService(deps);const id=randomUUID();
+    const job=await service.submitGeneration(input,id);
+    assert.equal(job.state,'queued');assert.equal(job.promptId,'accepted-prompt');
+    assert.equal((await createJobService(deps).getGeneration(id)).state,'completed');
+    assert.equal(submits,1);
+  } finally {t.mock.restoreAll();syncBuiltinESMExports();await cleanup(directory);}
 });
