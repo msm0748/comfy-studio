@@ -38,6 +38,7 @@ export function verifySession(token: string | undefined, config: AuthConfig, now
   } catch { return false; }
 }
 export function authDecision(path: string, authenticated: boolean, configured: boolean) {
+  if (['/manifest.webmanifest','/sw.js','/offline.html','/icons/icon-192.png','/icons/icon-512.png','/icons/apple-touch-icon.png'].includes(path)) return 'allow';
   if (path === '/login' || path === '/api/auth/login') return 'allow';
   if (configured && authenticated) return 'allow';
   return path.startsWith('/api/') ? 'unauthorized' : 'login';
