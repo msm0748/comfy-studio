@@ -15,6 +15,7 @@ async function json<T>(url: string, options?: RequestInit): Promise<T> {
     cache: 'no-store',
     signal: options?.signal || AbortSignal.timeout(25000),
   });
+  if (response.status === 401) window.location.replace('/login');
   const data = await response.json();
   if (!response.ok) throw new HttpError(data.error || '요청에 실패했습니다.', response.status);
   return data as T;

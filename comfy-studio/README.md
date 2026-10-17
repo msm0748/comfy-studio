@@ -17,12 +17,27 @@ pnpm dev --hostname 127.0.0.1 --port 3001
 
 ```powershell
 pnpm build
-pnpm start --hostname 127.0.0.1 --port 3001
+pnpm start --hostname 127.0.0.1 --port 3002
 ```
 
 ComfyUI는 http://127.0.0.1:8188 에서 실행되어 있어야 합니다.
-프런트 서버는 이번 작업에서 자동 시작에 추가하지 않았습니다.
-외부 도메인·터널·비밀번호 로그인은 후속 작업이며 현재는 로컬 전용입니다.
+프로덕션 서버는 개발 서버와 구분해 3002번 포트를 사용합니다.
+Cloudflare Tunnel은 `ai.koharu-market.com`을 `http://127.0.0.1:3002`로 연결합니다.
+PM2로 실행하려면 `pm2 start ecosystem.config.cjs --only comfy-studio` 후 `pm2 save`를 실행합니다.
+기존 `Koharu Market PM2` 로그인 작업이 저장된 앱 목록을 복원합니다.
+비밀번호 변경 후에는 `pm2 restart comfy-studio`를 실행합니다.
+
+## 로그인 환경변수
+
+`.env.example`을 `.env.local`로 복사한 뒤 `STUDIO_PASSWORD`에 8자 이상의 긴 비밀번호를,
+`STUDIO_SESSION_SECRET`에 32자 이상의 무작위 값을 설정합니다. 설정 후 서버를 재시작합니다.
+비밀번호가 없거나 세션 키가 짧으면 로그인과 생성 API는 차단됩니다.
+`.env.local` 등 실제 환경변수 파일은 `.gitignore`로 제외하며 빈 `.env.example`만 추적합니다.
+환경변수 이름에 `NEXT_PUBLIC_`을 붙이지 마세요.
+
+로그인은 8시간 유효한 HttpOnly/SameSite 쿠키를 사용하고 HTTPS에서는 Secure를 적용합니다.
+비밀번호나 세션 키를 바꾸면 기존 세션이 무효화됩니다. 연속 5회 실패하면 15분 동안 제한됩니다.
+생성 API는 Proxy와 데이터 처리 경계에서 모두 인증하며 결과 이미지도 보호합니다.
 
 ## 사용
 
@@ -71,7 +86,7 @@ pnpm typecheck
 pnpm build
 ```
 
-18개 검사: 요청 검증, 저장 프리셋/스위치 보존, 누락 모델, 작업 복구,
+검사 범위: 인증, 요청 검증, 저장 프리셋/스위치 보존, 누락 모델, 작업 복구,
 중복 제출 방지, 결과 경로 검증, 같은 출처 요청 검증을 포함합니다.
 응답 유실 시 요청 번호와 입력을 먼저 저장하여 같은 작업을 복구하고,
 서버 메타데이터 저장이 잠시 실패해도 접수된 작업을 실패로 바꾸지 않습니다.

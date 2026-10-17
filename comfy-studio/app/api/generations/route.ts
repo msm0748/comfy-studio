@@ -2,8 +2,10 @@ import { submitGeneration } from '@/lib/comfy-client';
 import { validateGenerationInput } from '@/lib/validation';
 import { apiError, sameOrigin } from '@/lib/api';
 import { ServiceError } from '@/lib/jobs';
+import { requireAuth } from '@/lib/require-auth';
 export async function POST(request:Request) {
   try {
+    await requireAuth();
     sameOrigin(request);
     const raw=await request.text();
     if(raw.length>40000)throw new ServiceError('입력 내용이 너무 깁니다.',400);
