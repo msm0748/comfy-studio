@@ -1,0 +1,135 @@
+{
+  "save": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "ComfyStudio/z-image-edit",
+      "images": [
+        "decode",
+        0
+      ]
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sampler",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "sampler": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 123299370479188,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "denoise": 0.6,
+      "model": [
+        "sampling",
+        0
+      ],
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ]
+    }
+  },
+  "sampling": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "shift": 3,
+      "sampling": "flow",
+      "model": [
+        "model",
+        0
+      ]
+    }
+  },
+  "model": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "test",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    }
+  },
+  "negative": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "positive",
+        0
+      ]
+    }
+  },
+  "latent": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "resize",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "reference": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "REFERENCE.png"
+    }
+  },
+  "resize": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "reference",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 1024,
+      "crop": "center"
+    }
+  }
+}

@@ -41,6 +41,7 @@ export function Studio() {
   const [referenceBusy,setReferenceBusy]=useState(false);
   const [referenceError,setReferenceError]=useState('');
   const [preserveIdentity,setPreserveIdentity]=useState(true);
+  const [strength,setStrength]=useState<GenerationInput['strength']>('medium');
   const referenceRequest=useRef(0);
   const referenceController=useRef<AbortController|null>(null);
   const generationModel=useRef<ModelId>('z-image');
@@ -82,7 +83,7 @@ export function Studio() {
   const restoreForm=useCallback(async(input:GenerationInput,signal?:AbortSignal)=>{
     const state=await restoreEditorState(input,async id=>(await json<{reference:ReferenceRecord}>(`/api/references/${id}`,{signal})).reference);
     if(signal?.aborted)return;
-    setModelId(state.input.modelId);setSizeId(state.input.sizeId);setPreserveIdentity(state.input.preserveIdentity!==false);
+    setStrength(state.input.strength??'medium');setModelId(state.input.modelId);setSizeId(state.input.sizeId);setPreserveIdentity(state.input.preserveIdentity!==false);
     if(getPreset(state.input.modelId).mode==='edit')setEditPrompt(state.input.prompt);else setPrompt(state.input.prompt);
     setReference(state.reference);setReferenceError(state.referenceError);
   },[]);
@@ -114,7 +115,7 @@ export function Studio() {
       setModelId(pending.input.modelId);
       setSizeId(pending.input.sizeId);
       if(getPreset(pending.input.modelId).mode==='edit')setEditPrompt(pending.input.prompt);else setPrompt(pending.input.prompt);
-      setPreserveIdentity(pending.input.preserveIdentity!==false);
+      setPreserveIdentity(pending.input.preserveIdentity!==false);setStrength(pending.input.strength??'medium');
     }
     const lookup = (id: string) => json<JobRecord>('/api/generations/' + encodeURIComponent(id), { signal: controller.signal });
     const recovery = pending ? restorePendingJob(pending, lookup) : lookup(current);
@@ -227,7 +228,7 @@ export function Studio() {
       const data=await json<{reference:ReferenceRecord}>('/api/references',{method:'POST',body,headers,signal:AbortSignal.any([controller.signal,AbortSignal.timeout(60000)])});
       if(requestId!==referenceRequest.current)return;
       setReference(data.reference);if(mode==='generate')generationModel.current=modelId;
-      setModelId('qwen-edit-2511');setSizeId('square');
+      setModelId(mode==='edit'?modelId:'qwen-edit-2511');setSizeId('square');
       promptRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
       requestAnimationFrame(()=>promptRef.current?.querySelector('textarea')?.focus({preventScroll:true}));
     }catch(cause){if(requestId===referenceRequest.current&&!controller.signal.aborted)setReferenceError(cause instanceof Error?cause.message:'참조 이미지를 준비하지 못했습니다.');}
@@ -252,7 +253,7 @@ export function Studio() {
           <div ref={promptRef}>
             <GenerationForm models={models} modelId={modelId} sizeId={sizeId} prompt={mode==='edit'?editPrompt:prompt} busy={busy}
               mode={mode} onMode={changeMode} reference={reference} referenceBusy={referenceBusy} referenceError={referenceError}
-              onReference={file=>void prepareReference(file)} onRemoveReference={removeReference} preserveIdentity={preserveIdentity} onPreserveIdentity={setPreserveIdentity} onPreview={(src,alt)=>setExpanded({src,alt})}
+              strength={strength} onStrength={setStrength} onReference={file=>void prepareReference(file)} onRemoveReference={removeReference} preserveIdentity={preserveIdentity} onPreserveIdentity={setPreserveIdentity} onPreview={(src,alt)=>setExpanded({src,alt})}
               onReferenceRetry={reconnect} canRetryReference={!!job?.input.referenceId&&!reference}
               connected={connected} onModel={value => { setModelId(value); setSizeId('square'); }}
               onSize={setSizeId} onPrompt={mode==='edit'?setEditPrompt:setPrompt} onSubmit={submit} onRefresh={refresh} />

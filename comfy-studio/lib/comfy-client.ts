@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { compileZImageEdit,loadZImageEdit } from './z-image-edit.ts';
 import { getPreset, listPresetDefinitions } from './presets.ts';
 import { compileWorkflow, loadWorkflow } from './workflow.ts';
 import { createJobService, normalizeHistory, ServiceError, PreparationError, validateGraphModels } from './jobs.ts';
@@ -23,6 +24,7 @@ async function nodeInfo():Promise<NodeInfo> {
 async function prepared(input:GenerationInput,info?:NodeInfo,referenceFilename?:string):Promise<ApiGraph> {
   const preset=getPreset(input.modelId);
   const schema=info || await nodeInfo();
+  if(preset.id==='z-image-edit')return compileZImageEdit(await loadZImageEdit(),input,referenceFilename??`ComfyStudio/references/${input.referenceId}.png`,schema);
   if(preset.mode==='edit')return compileEditWorkflow(await loadEditWorkflow(),input,referenceFilename??`ComfyStudio/references/${input.referenceId}.png`,schema);
   const graph=compileWorkflow(preset,await loadWorkflow(preset),input,schema);
   validateGraphModels(graph,schema);return graph;
