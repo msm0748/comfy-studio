@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { compileEditWorkflow } from '../lib/edit-workflow.ts';
+import type { ApiGraph,GenerationInput,NodeInfo } from '../lib/types.ts';
+const graph=JSON.parse(await readFile(new URL('../workflows/qwen-image-edit-2511.api.json',import.meta.url),'utf8')) as ApiGraph;
+const input:GenerationInput={modelId:'qwen-edit-2511',sizeId:'landscape',prompt:'walk by the ocean',referenceId:'12345678-1234-4234-8234-123456789abc',preserveIdentity:true};
+const filename=`ComfyStudio/references/${input.referenceId}.png`;
+const info:NodeInfo=Object.fromEntries(Object.values(graph).map(n=>[n.class_type,{input:{required:{}}}]));
+for(const node of Object.values(graph))for(const key of ['unet_name','clip_name','vae_name','lora_name'])if(key in node.inputs)info[node.class_type].input.required![key]=[[node.inputs[key]]];
+test('editing binds a real reference and requested dimensions while preserving saved sampling settings',()=>{
+  const result=compileEditWorkflow(graph,input,filename,info);
+  assert.equal(result.reference.inputs.image,filename);
+  assert.deepEqual(result.positive.inputs.image1,['reference_scale',0]);
+  assert.deepEqual(result.reference_scale.inputs.image,['reference',0]);
+  assert.match(String(result.positive.inputs.prompt),/walk by the ocean/);
+  assert.match(String(result.positive.inputs.prompt),/identity/);
+  assert.deepEqual(result.latent.inputs,{width:1152,height:896,batch_size:1});
+  for(const key of ['steps','cfg','sampler_name','scheduler','denoise'])assert.deepEqual(result.sampler.inputs[key],graph.sampler.inputs[key]);
+  const custom=structuredClone(graph);custom.sampler.inputs.steps=8;
+  assert.equal(compileEditWorkflow(custom,input,filename,info).sampler.inputs.steps,8);
+  assert.equal(compileEditWorkflow(graph,{...input,preserveIdentity:false},filename,info).positive.inputs.prompt,input.prompt);
+});
+test('editing rejects missing nodes/models, wrong loaders and arbitrary reference paths',()=>{
+  assert.throws(()=>compileEditWorkflow(graph,input,'../../private.png',info));
+  const bad=structuredClone(graph);bad.model.inputs.unet_name='qwen_image_2.1_int8_convrot.safetensors';assert.throws(()=>compileEditWorkflow(bad,input,filename,info));
+  assert.throws(()=>compileEditWorkflow(graph,input,filename,{}));
+  const missing=structuredClone(info);missing.UNETLoader.input.required!.unet_name=[[]];assert.throws(()=>compileEditWorkflow(graph,input,filename,missing));
+  const detached=structuredClone(graph);delete detached.positive.inputs.image1;assert.throws(()=>compileEditWorkflow(detached,input,filename,info));
+});
