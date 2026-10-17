@@ -1,0 +1,5 @@
+import type { SizeId,SizeOption } from '@/lib/types';
+import { Icon } from './icon';
+export function SizePicker({options,value,onChange,disabled}:{options:SizeOption[];value:SizeId;onChange:(id:SizeId)=>void;disabled:boolean}) {
+  return <fieldset className="size-field"><legend className="field-label">이미지 사이즈</legend><div className="size-grid">{options.map(size=><button type="button" key={size.id} className={`size-option ${value===size.id?'selected':''}`} disabled={disabled} onClick={()=>onChange(size.id)} aria-pressed={value===size.id} aria-label={`${size.label}, ${size.width} × ${size.height}, ${size.use}`}><span className="size-illustration"><span style={{width:Math.min(27,27*size.width/size.height),height:Math.min(27,27*size.height/size.width)}}/>{value===size.id&&<span className="size-tick"><Icon name="check" size={10}/></span>}</span><span className="size-name">{size.label}</span><span className="size-dimensions">{size.width} × {size.height}</span>{size.recommended&&<span className="recommended">추천</span>}</button>)}</div><p className="field-hint size-hint">{options.find(s=>s.id===value)?.use}<span>모델에 맞춘 해상도</span></p></fieldset>;
+}
