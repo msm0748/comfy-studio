@@ -12,7 +12,7 @@ type AuthConfig = { password: string; secret: string };
 export function getAuthConfig(env: Record<string, string | undefined> = process.env): AuthConfig | null {
   const password = env.STUDIO_PASSWORD;
   const secret = env.STUDIO_SESSION_SECRET;
-  return password && password.length >= 8 && secret && secret.length >= 32 ? { password, secret } : null;
+  return password && secret && secret.length >= 32 ? { password, secret } : null;
 }
 function digest(value: string, key: string) { return createHmac('sha256', key).update(value).digest(); }
 export function checkPassword(input: string, config: AuthConfig) {

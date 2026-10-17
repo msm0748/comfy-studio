@@ -34,9 +34,10 @@ Windows 로그인 전에도 스튜디오와 Cloudflare 터널을 시작합니다
 
 ## 로그인 환경변수
 
-`.env.example`을 `.env.local`로 복사한 뒤 `STUDIO_PASSWORD`에 8자 이상의 긴 비밀번호를,
+`.env.example`을 `.env.local`로 복사한 뒤 `STUDIO_PASSWORD`에 사용할 비밀번호를,
 `STUDIO_SESSION_SECRET`에 32자 이상의 무작위 값을 설정합니다. 설정 후 서버를 재시작합니다.
 비밀번호가 없거나 세션 키가 짧으면 로그인과 생성 API는 차단됩니다.
+비밀번호는 6자 미만도 허용하며 빈 값만 차단합니다.
 `.env.local` 등 실제 환경변수 파일은 `.gitignore`로 제외하며 빈 `.env.example`만 추적합니다.
 환경변수 이름에 `NEXT_PUBLIC_`을 붙이지 마세요.
 

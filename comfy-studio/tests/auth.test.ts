@@ -20,6 +20,17 @@ test('password comparison accepts only the exact configured value',()=>{
   assert.equal(checkPassword(' only-a-test-password',config),false);
   assert.equal(checkPassword('',config),false);
 });
+
+test('passwords shorter than six characters can authenticate while empty passwords stay disabled',()=>{
+  for(const password of ['7','test','12345']) {
+    const shortConfig=getAuthConfig({STUDIO_PASSWORD:password,STUDIO_SESSION_SECRET:secret});
+    assert.ok(shortConfig);
+    assert.equal(checkPassword(password,shortConfig),true);
+    assert.equal(checkPassword('',shortConfig),false);
+    assert.equal(verifySession(createSession(shortConfig,1000),shortConfig,1001),true);
+  }
+  assert.equal(getAuthConfig({STUDIO_PASSWORD:'',STUDIO_SESSION_SECRET:secret}),null);
+});
 test('sessions expire, reject tampering and stop working after a password rotation',()=>{
   const session=createSession(config,1000);
   assert.equal(verifySession(session,config,1001),true);
