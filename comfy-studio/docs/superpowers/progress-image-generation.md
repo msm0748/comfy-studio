@@ -6,4 +6,5 @@ Ruling: user requested Higgsfield-like experience after approving the plan; use 
 Ruling: reuse the user's existing Next.js folder on a new feature branch, per desktop instructions. No new worktree. Cost if wrong: implementation lives alongside existing local work.
 Ruling: adapt bash-only progress helpers to this checked-in PowerShell-compatible ledger. Cost if wrong: bookkeeping is manual, not generated.
 
-Task 1: in progress.
+Task 1: complete — commit 3f3dbfb, validation tests RED→GREEN, 3/3 passed.
+Task 2: complete — three graph snapshots tested; saved settings, Qwen switch, Krea dynamic sampling preserved; workflow tests RED→GREEN, 4/4 passed.
