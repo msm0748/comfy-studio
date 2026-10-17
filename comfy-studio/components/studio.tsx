@@ -209,7 +209,7 @@ export function Studio() {
   function changeMode(next:StudioMode){
     if(busy)return;
     if(mode==='generate')generationModel.current=modelId;
-    setModelId(next==='edit'?'qwen-edit-2511':generationModel.current);setSizeId('square');
+    setModelId(next==='edit'?'z-image-edit':generationModel.current);setSizeId('square');
   }
   async function prepareReference(source:File|JobRecord){
     if(busy)return;
@@ -219,7 +219,7 @@ export function Studio() {
     setReferenceBusy(true);setReferenceError('');
     if(!(source instanceof File)){
       if(mode==='generate')generationModel.current=modelId;
-      setModelId('qwen-edit-2511');setEditPrompt('');setPreserveIdentity(true);
+      setModelId(mode==='edit'?modelId:'z-image-edit');setEditPrompt('');setPreserveIdentity(true);
     }
     try{
       let body:BodyInit;let headers:HeadersInit|undefined;
@@ -228,7 +228,7 @@ export function Studio() {
       const data=await json<{reference:ReferenceRecord}>('/api/references',{method:'POST',body,headers,signal:AbortSignal.any([controller.signal,AbortSignal.timeout(60000)])});
       if(requestId!==referenceRequest.current)return;
       setReference(data.reference);if(mode==='generate')generationModel.current=modelId;
-      setModelId(mode==='edit'?modelId:'qwen-edit-2511');setSizeId('square');
+      setModelId(mode==='edit'?modelId:'z-image-edit');setSizeId('square');
       promptRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
       requestAnimationFrame(()=>promptRef.current?.querySelector('textarea')?.focus({preventScroll:true}));
     }catch(cause){if(requestId===referenceRequest.current&&!controller.signal.aborted)setReferenceError(cause instanceof Error?cause.message:'참조 이미지를 준비하지 못했습니다.');}
