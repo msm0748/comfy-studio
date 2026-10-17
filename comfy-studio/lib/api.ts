@@ -5,5 +5,9 @@ export function apiError(error:unknown) {
 }
 export function sameOrigin(request:Request) {
   const origin=request.headers.get('origin');
-  if(origin && origin!==new URL(request.url).origin)throw new ServiceError('다른 사이트에서 보낸 요청은 허용하지 않습니다.',403);
+  if(!origin)return;
+  let source:URL;
+  try{source=new URL(origin);}catch{throw new ServiceError('올바르지 않은 요청 출처입니다.',403);}
+  const host=request.headers.get('host') || new URL(request.url).host;
+  if(!['http:','https:'].includes(source.protocol) || source.host!==host)throw new ServiceError('다른 사이트에서 보낸 요청은 허용하지 않습니다.',403);
 }

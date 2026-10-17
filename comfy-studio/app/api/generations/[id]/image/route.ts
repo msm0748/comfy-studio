@@ -1,6 +1,5 @@
 import { getGenerationImage } from '@/lib/comfy-client';
 import { apiError } from '@/lib/api';
-export const runtime='nodejs';
 export async function GET(request:Request,context:{params:Promise<{id:string}>}) {
   try {
     const {id}=await context.params;

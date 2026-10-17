@@ -2,7 +2,6 @@ import { submitGeneration } from '@/lib/comfy-client';
 import { validateGenerationInput } from '@/lib/validation';
 import { apiError, sameOrigin } from '@/lib/api';
 import { ServiceError } from '@/lib/jobs';
-export const runtime='nodejs';
 export async function POST(request:Request) {
   try {
     sameOrigin(request);

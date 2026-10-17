@@ -36,6 +36,7 @@ yarn-error.log*
 /.data/
 /*.tmp.json
 /*.log
+/public/__qa-responsive.html
 
 # vercel
 .vercel

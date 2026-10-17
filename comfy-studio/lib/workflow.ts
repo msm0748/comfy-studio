@@ -16,7 +16,8 @@ const linksOf = (graph:UiGraph):Link[] => graph.links.map(link => Array.isArray(
 
 export async function loadWorkflow(preset: Preset): Promise<unknown> {
   const root = process.env.COMFYUI_WORKFLOW_DIR || 'C:/ComfyUI/ComfyUI_windows_portable/ComfyUI/user/default/workflows';
-  return JSON.parse((await readFile(path.join(root,preset.workflowFile),'utf8')).replace(/^\uFEFF/,''));
+  // Workflows intentionally live outside the Next.js application and are read at runtime.
+  return JSON.parse((await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root,preset.workflowFile),'utf8')).replace(/^\uFEFF/,''));
 }
 
 function widgetInputs(node:UiNode, info:NodeInfo[string] | undefined):Record<string,unknown> {
