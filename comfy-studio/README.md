@@ -25,7 +25,12 @@ ComfyUI는 http://127.0.0.1:8188 에서 실행되어 있어야 합니다.
 Cloudflare Tunnel은 `ai.koharu-market.com`을 `http://127.0.0.1:3002`로 연결합니다.
 PM2로 실행하려면 `pm2 start ecosystem.config.cjs --only comfy-studio` 후 `pm2 save`를 실행합니다.
 기존 `Koharu Market PM2` 로그인 작업이 저장된 앱 목록을 복원합니다.
+`Comfy Studio PM2 Auto Start` 작업은 부팅 45초 후 S4U 계정으로 PM2 목록을 복원하므로
+Windows 로그인 전에도 스튜디오와 Cloudflare 터널을 시작합니다. 기존 ComfyUI 부팅 작업은 별도로 실행됩니다.
+등록 스크립트는 `scripts/Register-Autostart.ps1`, 실행 스크립트는 `scripts/Start-PM2.ps1`입니다.
+등록은 관리자 PowerShell에서 한 번 실행하며 로그는 Git에서 제외한 `.data`에 기록합니다.
 비밀번호 변경 후에는 `pm2 restart comfy-studio`를 실행합니다.
+이 비밀번호와 세션 키는 서버 실행 시 읽으므로 변경 후 다시 빌드할 필요가 없습니다.
 
 ## 로그인 환경변수
 
