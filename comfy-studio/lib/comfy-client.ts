@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { translatePrompt } from './translate-prompt.ts';
 import { compileZImageEdit,loadZImageEdit } from './z-image-edit.ts';
 import { getPreset, listPresetDefinitions } from './presets.ts';
 import { compileWorkflow, loadWorkflow } from './workflow.ts';
@@ -41,7 +42,11 @@ export async function getModelOptions():Promise<{connected:boolean;models:ModelO
 }
 async function submit(input:GenerationInput,id:string) {
   let prompt:ApiGraph;
-  try{const filename=input.referenceId?await uploadReference(input.referenceId):undefined;prompt=await prepared(input,undefined,filename);}
+  try{
+    const englishPrompt=await translatePrompt(input.prompt);
+    const filename=input.referenceId?await uploadReference(input.referenceId):undefined;
+    prompt=await prepared({...input,prompt:englishPrompt},undefined,filename);
+  }
   catch(error){throw new PreparationError(error instanceof ServiceError?error.message:'생성 준비를 완료하지 못했습니다. 참조 이미지와 모델 상태를 확인한 뒤 다시 시도해 주세요.');}
   const data=await (await request('/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,client_id:id,extra_data:{comfy_studio_job_id:id}})})).json();
   if(typeof data.prompt_id!=='string')throw new ServiceError('ComfyUI가 작업 번호를 반환하지 않았습니다.');

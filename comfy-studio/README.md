@@ -147,3 +147,25 @@ Android/Chromium은 지원 시 앱 설치 안내를 표시하고, iPhone Safari�
 설치 앱에서도 기존 비밀번호 로그인이 필요하며 PC·ComfyUI·터널 서버가 켜져 있어야 합니다.
 서비스 워커는 공개 연결 안내 페이지만 캐시합니다. 로그인 화면·API·참조 사진·결과 이미지는 캐시하지 않습니다.
 오프라인 생성이나 백그라운드 생성 예약은 제공하지 않습니다. 모바일과 터치 기기의 입력 글자는 최소 16px이며 핀치 확대는 유지합니다.
+
+## 프롬프트 자동 번역
+
+생성·편집 프롬프트를 Google Cloud Translation Advanced v3로 전송하며, 입력 언어를 자동 감지하여 영어로 번역한 값을 모델에 전달합니다. 영어로 감지된 입력은 원문을 사용합니다. API가 지원하는 언어가 대상이며 혼합 언어·짧은 문장은 감지가 부정확할 수 있습니다. 화면과 작업 입력에는 원문을 유지하고, 참조 사진은 번역 서비스로 전송하지 않습니다.
+
+프로젝트 `koharu-market-492802`의 전용 계정 `comfy-studio-translator@koharu-market-492802.iam.gserviceaccount.com`을 사용합니다. 기존 다른 앱의 서비스 계정이나 API 키로 대체하지 않습니다. OAuth 범위는 `cloud-translation`으로 제한하고 토큰은 Google 공식 라이브러리로 발급·자동 갱신합니다. IP 허용 목록을 사용하지 않으므로 집 공인 IP 변경으로 인증이 차단되지 않습니다.
+
+관리자 계정으로 로그인된 Google Cloud CLI에서 다음 스크립트를 실행하면 전용 계정, 최소 권한 커스텀 역할, 로컬 인증 파일을 만들 수 있습니다. 스크립트는 관리자 로그인이나 보안 정책을 변경하지 않습니다. 프로젝트에서 JSON 키 생성을 금지한 경우 정책을 해제하지 말고 별도 인증 방식을 검토해야 합니다.
+
+```powershell
+./scripts/Setup-TranslationServiceAccount.ps1 -CreateKey
+```
+
+커스텀 역할에는 `cloudtranslate.generalModels.predict`, `serviceusage.services.use`만 포함합니다. 전용 계정에는 이 역할만 부여하고 Owner/Editor 권한이나 다른 앱의 계정 권한을 사용하지 않습니다. 인증 JSON은 `.data/secrets/google-translate.json`에 저장하며 Git과 웹에서 제외됩니다. 파일 내용은 채팅·로그에 붙여넣지 않습니다. `.env.local`에는 `.env.example`처럼 프로젝트 ID와 JSON 파일 경로만 설정합니다. 사용 계정의 보안과 인증 파일의 접근 권한은 별도로 관리해야 합니다.
+
+Google 프로젝트의 Cloud Translation API, 결제·할당량 설정이 필요하며 사용 요금이 적용될 수 있습니다. 인증 파일 변경은 다음 요청부터 읽고 토큰 클라이언트를 갱신합니다. 환경변수 변경은 `pm2 restart comfy-studio`로 반영합니다.
+
+번역은 작업별 잠금과 중복 제출 검사 안에서 한 번 수행합니다. 번역이나 인증 실패 시 생성 요청을 보내지 않고 작업을 실패 처리합니다. 실제 `/prompt` 제출 이후 연결 오류는 기존 작업 복구 규칙을 유지합니다.
+
+2026-10-18 운영 연결을 검증했습니다. 전용 계정에는 위 두 권한으로 구성한 `Comfy Studio Translator` 커스텀 역할만 부여했고, JSON 키는 비공개 폴더에 저장해 현재 Windows 사용자·SYSTEM·관리자만 접근하도록 제한했습니다. 한국어·일본어의 실제 영어 번역과 영어 원문 유지를 확인했습니다.
+
+운영 사이트에서 한국어 머그컵 프롬프트로 Z-Image Turbo 1024×1024 한 장을 생성했습니다(약 17초). ComfyUI 실행 기록의 텍스트 입력은 영어 번역이고 작업 기록의 입력은 한국어 원문임을 확인했습니다. 같은 작업 번호의 재요청은 같은 ComfyUI 생성 번호를 반환했으며 외부 HTTPS 도메인의 결과 이미지 접근과 비로그인 API 차단도 확인했습니다. 이 검증에서 Qwen/Krea 생성이나 참조 편집은 추가로 실행하지 않았습니다. 교체 전 운영 빌드는 Git에서 제외한 `.data/translation-rollback-20261018`에 보관했습니다.
