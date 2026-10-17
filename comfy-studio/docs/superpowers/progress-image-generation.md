@@ -8,3 +8,4 @@ Ruling: adapt bash-only progress helpers to this checked-in PowerShell-compatibl
 
 Task 1: complete — commit 3f3dbfb, validation tests RED→GREEN, 3/3 passed.
 Task 2: complete — three graph snapshots tested; saved settings, Qwen switch, Krea dynamic sampling preserved; workflow tests RED→GREEN, 4/4 passed.
+Task 3: complete — persistent jobs, idempotent submissions, safe image lookup, missing-model checks and reconnect behavior; 11/11 tests and TypeScript passed. Test scratch moved inside workspace because sandbox denies atomic replace in virtualized OS temp.
