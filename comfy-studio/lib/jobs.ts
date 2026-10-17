@@ -8,6 +8,8 @@ export class ServiceError extends Error {
   status: number;
   constructor(message:string,status=503){super(message);this.status=status;}
 }
+/** Preparation failed before /prompt was called, so acceptance is impossible. */
+export class PreparationError extends ServiceError {}
 export function assertJobId(id:string) {
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new ServiceError('올바르지 않은 작업 번호입니다.',400);
 }
@@ -106,7 +108,7 @@ export function createJobService(deps:Dependencies) {
         try {promptId=await deps.submit(input,id);}
         catch(error) {
           console.error('[ComfyStudio submit]',error);
-          const rejected=error instanceof ServiceError&&error.status>=400&&error.status<500;
+          const rejected=error instanceof PreparationError||(error instanceof ServiceError&&error.status>=400&&error.status<500);
           job={...job,state:rejected?'failed':'submitting',error:error instanceof ServiceError?error.message:'생성 요청의 접수 상태를 확인하고 있습니다. 같은 작업을 새로 제출하지 않습니다.'};
           await save(job);
           return job;

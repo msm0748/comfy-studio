@@ -5,15 +5,34 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
-import { createJobService, normalizeHistory, validateGraphModels } from '../lib/jobs.ts';
+import { createJobService, normalizeHistory, validateGraphModels, PreparationError } from '../lib/jobs.ts';
 import type { GenerationInput, NodeInfo } from '../lib/types.ts';
 const input:GenerationInput={modelId:'z-image',prompt:'a red chair',sizeId:'square'};
+test('edit reference and identity survive restart and cannot be changed under the same job ID',async()=>{
+  const directory=await mkdtemp(path.join(tempRoot,'edit-jobs-'));
+  const edit:GenerationInput={modelId:'qwen-edit-2511',prompt:'at the beach',sizeId:'square',referenceId:randomUUID(),preserveIdentity:true};
+  let submissions=0;
+  const deps={directory,submit:async()=>{submissions++;return 'edit-prompt';},inspect:async()=>({state:'running' as const,images:[]}),image:async()=>new Response('image')};
+  try{
+    const id=randomUUID();const service=createJobService(deps);
+    await Promise.all([service.submitGeneration(edit,id),service.submitGeneration(edit,id)]);
+    const restarted=createJobService(deps);assert.deepEqual((await restarted.getGeneration(id)).input,edit);
+    await assert.rejects(()=>restarted.submitGeneration({...edit,referenceId:randomUUID()},id));
+    assert.equal(submissions,1);
+  }finally{await cleanup(directory);}
+});
 const tempRoot=path.resolve('.data','test-tmp');
 await mkdir(tempRoot,{recursive:true});
 async function cleanup(directory:string){
   assert.ok(path.resolve(directory).startsWith(tempRoot+path.sep));
   await rm(directory,{recursive:true,force:true});
 }
+test('a failure before prompt submission fails immediately and permits a fresh safe retry',async()=>{
+  const directory=await mkdtemp(path.join(tempRoot,'prepare-'));let attempts=0;let recoveries=0;
+  const deps={directory,submit:async()=>{attempts++;if(attempts===1)throw new PreparationError('Reference upload unavailable');return 'accepted';},inspect:async()=>({state:'running' as const,images:[]}),image:async()=>new Response('image'),recover:async()=>{recoveries++;return null;}};
+  try{const service=createJobService(deps);const first=await service.submitGeneration(input,randomUUID());assert.equal(first.state,'failed');assert.equal((await service.getGeneration(first.id)).state,'failed');assert.equal(recoveries,0);assert.equal((await service.submitGeneration(input,randomUUID())).state,'queued');}
+  finally{await cleanup(directory);}
+});
 test('persists a submitted job and repeated requests never queue it twice', async () => {
   const directory=await mkdtemp(path.join(tempRoot,'comfy-jobs-'));
   let submissions=0;
