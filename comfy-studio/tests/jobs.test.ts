@@ -8,6 +8,19 @@ import { syncBuiltinESMExports } from 'node:module';
 import { createJobService, normalizeHistory, validateGraphModels } from '../lib/jobs.ts';
 import type { GenerationInput, NodeInfo } from '../lib/types.ts';
 const input:GenerationInput={modelId:'z-image',prompt:'a red chair',sizeId:'square'};
+test('edit reference and identity survive restart and cannot be changed under the same job ID',async()=>{
+  const directory=await mkdtemp(path.join(tempRoot,'edit-jobs-'));
+  const edit:GenerationInput={modelId:'qwen-edit-2511',prompt:'at the beach',sizeId:'square',referenceId:randomUUID(),preserveIdentity:true};
+  let submissions=0;
+  const deps={directory,submit:async()=>{submissions++;return 'edit-prompt';},inspect:async()=>({state:'running' as const,images:[]}),image:async()=>new Response('image')};
+  try{
+    const id=randomUUID();const service=createJobService(deps);
+    await Promise.all([service.submitGeneration(edit,id),service.submitGeneration(edit,id)]);
+    const restarted=createJobService(deps);assert.deepEqual((await restarted.getGeneration(id)).input,edit);
+    await assert.rejects(()=>restarted.submitGeneration({...edit,referenceId:randomUUID()},id));
+    assert.equal(submissions,1);
+  }finally{await cleanup(directory);}
+});
 const tempRoot=path.resolve('.data','test-tmp');
 await mkdir(tempRoot,{recursive:true});
 async function cleanup(directory:string){

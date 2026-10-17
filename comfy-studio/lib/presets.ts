@@ -9,9 +9,10 @@ const sizes = (qwen: boolean): SizeOption[] => {
   }));
 };
 const presets: Preset[] = [
-  { id:'z-image', name:'Z-Image Turbo', description:'일상의 순간부터 새로운 아이디어까지', tag:'빠른 시작', workflowFile:'T2I_Z-Image-Turbo.json', sizes:sizes(false), commercial:{label:'상업 이용 가능',license:'Apache-2.0',conditional:false} },
-  { id:'qwen-2512', name:'Qwen Image 2512', description:'디테일을 꼼꼼하게 담는 이미지', tag:'섬세한 표현', workflowFile:'T2I_Qwen-Image-2512.json', sizes:sizes(true), commercial:{label:'상업 이용 가능',license:'Apache-2.0',conditional:false} },
-  { id:'krea-2', name:'Krea 2 Turbo', description:'나만의 감각을 더하는 크리에이티브', tag:'크리에이티브', workflowFile:'Krea2-Turbo-RTX3090.json', sizes:sizes(false), commercial:{label:'상업 이용 조건부 허용',license:'Krea 2 Community',conditional:true,condition:'연 매출 $1M 미만 · 50석 미만'} },
+  { mode:'generate', id:'z-image', name:'Z-Image Turbo', description:'일상의 순간부터 새로운 아이디어까지', tag:'빠른 시작', workflowFile:'T2I_Z-Image-Turbo.json', sizes:sizes(false), commercial:{label:'상업 이용 가능',license:'Apache-2.0',conditional:false} },
+  { mode:'generate', id:'qwen-2512', name:'Qwen Image 2512', description:'디테일을 꼼꼼하게 담는 이미지', tag:'섬세한 표현', workflowFile:'T2I_Qwen-Image-2512.json', sizes:sizes(true), commercial:{label:'상업 이용 가능',license:'Apache-2.0',conditional:false} },
+  { mode:'generate', id:'krea-2', name:'Krea 2 Turbo', description:'나만의 감각을 더하는 크리에이티브', tag:'크리에이티브', workflowFile:'Krea2-Turbo-RTX3090.json', sizes:sizes(false), commercial:{label:'상업 이용 조건부 허용',license:'Krea 2 Community',conditional:true,condition:'연 매출 $1M 미만 · 50석 미만'} },
+  { mode:'edit', id:'qwen-edit-2511', name:'Qwen Image Edit 2511', description:'참조 이미지의 인물과 장면을 새롭게', tag:'인물 참조 편집', workflowFile:'qwen-image-edit-2511.api.json', sizes:sizes(false), commercial:{label:'상업 이용 가능',license:'Apache-2.0',conditional:false} },
 ];
 export function listPresetDefinitions(): Preset[] { return structuredClone(presets); }
 export function getPreset(id: ModelId): Preset {
