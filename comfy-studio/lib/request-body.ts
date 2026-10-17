@@ -1,6 +1,6 @@
 import { ServiceError } from './jobs.ts';
 
-export async function readLimitedBody(request:Request,maxBytes:number):Promise<Uint8Array> {
+export async function readLimitedBody(request:Pick<Request,'headers'|'body'>,maxBytes:number):Promise<Uint8Array> {
   const length=request.headers.get('content-length');
   if(length && (!/^\d+$/.test(length)||!Number.isSafeInteger(Number(length))))throw new ServiceError('요청 크기를 확인해 주세요.',400);
   if(length && Number(length)>maxBytes)throw new ServiceError('이미지 용량이 너무 큽니다. 10MB 이하로 선택해 주세요.',413);
