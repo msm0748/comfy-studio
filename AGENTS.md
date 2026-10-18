@@ -12,6 +12,7 @@
 | Qwen-Image-Edit-2511-Lightning 4steps V1.0 LoRA | Apache-2.0 | 2026-10-17 제작자 배포 라이선스 확인. 2511 편집 모델 전용이며 기존 2512 LoRA와 구분. https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning |
 | Krea 2 Turbo | Krea 2 Community | 연 매출 $1M 미만, 50석 미만 조건 |
 | ACE-Step 1.5 | MIT | 오디오/음악 |
+| ACE-Step 1.5 Turbo AIO (Comfy-Org 배포) | Apache-2.0 | 2026-10-18 배포 모델 카드 확인. 설치된 `ace_step_1.5_turbo_aio.safetensors` 재사용. https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files |
 | MiniMax H3 | 이메일 신청으로 상업 사용 허가 받음 (2026-09-29) | 라이선스 본문은 한국 제외이나 사용자가 별도 허가를 받았으므로 **사용 가능** |
 | MiniMax H3 Latent Upscaler 3D Conv v1 (LBH-123-AI, bf16) | Apache-2.0 | 2026-10-18 제작자 모델 카드의 라이선스 확인. 설치된 `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` 재사용. 노드 코드는 MIT. https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler |
 

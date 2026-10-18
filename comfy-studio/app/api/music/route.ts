@@ -1,0 +1,2 @@
+import {requireAuth} from '@/lib/require-auth';import {apiError} from '@/lib/api';import {handleMusicPost} from '@/lib/music/api';import {submitMusic} from '@/lib/music/service';
+export async function POST(request:Request){try{return Response.json(await handleMusicPost(request,{authorize:requireAuth,submit:submitMusic}),{status:202,headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}
