@@ -1,0 +1,2 @@
+import {requireAuth} from '@/lib/require-auth';import {apiError,sameOrigin} from '@/lib/api';import {retryVideoFinalization} from '@/lib/video/service';
+export async function POST(request:Request,context:{params:Promise<{id:string}>}){try{await requireAuth();sameOrigin(request);const {id}=await context.params;return Response.json(await retryVideoFinalization(id),{status:202,headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}

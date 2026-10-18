@@ -13,6 +13,7 @@
 | Krea 2 Turbo | Krea 2 Community | 연 매출 $1M 미만, 50석 미만 조건 |
 | ACE-Step 1.5 | MIT | 오디오/음악 |
 | MiniMax H3 | 이메일 신청으로 상업 사용 허가 받음 (2026-09-29) | 라이선스 본문은 한국 제외이나 사용자가 별도 허가를 받았으므로 **사용 가능** |
+| MiniMax H3 Latent Upscaler 3D Conv v1 (LBH-123-AI, bf16) | Apache-2.0 | 2026-10-18 제작자 모델 카드의 라이선스 확인. 설치된 `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` 재사용. 노드 코드는 MIT. https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler |
 
 ## 금지 (상업적 사용 불가)
 
