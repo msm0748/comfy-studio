@@ -1,3 +1,2 @@
 import {requireAuth} from '@/lib/require-auth';import {apiError} from '@/lib/api';import {handleVideoPost} from '@/lib/video/api';import {submitVideo} from '@/lib/video/service';
-export const runtime='nodejs';
 export async function POST(request:Request){try{return Response.json(await handleVideoPost(request,{authorize:requireAuth,submit:submitVideo}),{status:202,headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}

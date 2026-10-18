@@ -2,9 +2,9 @@ import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';import path fro
 import {assertJobId,ServiceError,PreparationError} from '../jobs.ts';import {getVideoPreset,videoFrames} from './presets.ts';import {validateVideoInput} from './validation.ts';
 import type {VideoInput,VideoJobRecord,VideoInspection,VideoOutputRef,VideoMedia} from './types.ts';
 export function safeVideoOutput(raw:unknown):VideoOutputRef{
- const r=raw as VideoOutputRef;
- if(!r||r.type!=='output'||typeof r.filename!=='string'||!r.filename||!/^[-a-zA-Z0-9_ .]+\.mp4$/i.test(r.filename)||r.filename.includes('..')||typeof r.subfolder!=='string'||/[\\:\x00]/.test(r.subfolder)||r.subfolder.startsWith('/')||r.subfolder.split('/').some(p=>p==='..'||p==='.')||r.subfolder.length>256)throw new ServiceError('안전하지 않은 영상 경로입니다.',400);
- return {filename:r.filename,subfolder:r.subfolder,type:'output'};
+ const r=raw as VideoOutputRef;const folder=typeof r?.subfolder==='string'?r.subfolder.replace(/\\/g,'/'):null;
+ if(!r||r.type!=='output'||typeof r.filename!=='string'||!r.filename||!/^[-a-zA-Z0-9_ .]+\.mp4$/i.test(r.filename)||r.filename.includes('..')||folder===null||/[:\x00]/.test(folder)||folder.startsWith('/')||folder.split('/').some(p=>p==='..'||p==='.')||folder.length>256)throw new ServiceError('안전하지 않은 영상 경로입니다.',400);
+ return {filename:r.filename,subfolder:folder,type:'output'};
 }
 export function normalizeVideoHistory(raw:unknown):VideoInspection{
  const h=raw as {status?:{completed?:boolean;status_str?:string;messages?:[string,unknown][]};outputs?:Record<string,{images?:unknown[];videos?:unknown[]}>};

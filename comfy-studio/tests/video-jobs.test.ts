@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,mkdir} from 'node:fs/promises';import path from 'node:path';import {randomUUID} from 'node:crypto';
-import {createVideoJobService,normalizeVideoHistory} from '../lib/video/jobs.ts';import {PreparationError} from '../lib/jobs.ts';
+import {createVideoJobService,normalizeVideoHistory,safeVideoOutput} from '../lib/video/jobs.ts';import {PreparationError} from '../lib/jobs.ts';
 const input={mode:'text' as const,prompt:'빨간 머그컵',resolution:'480p' as const,durationSeconds:7};
 const output={filename:'clip.mp4',subfolder:'ComfyStudio/video',type:'output' as const};
 await mkdir('.data/test-tmp',{recursive:true});
@@ -21,4 +21,8 @@ test('video history rejects unsafe output and completed jobs without video',()=>
  assert.equal(normalizeVideoHistory({status:{completed:true},outputs:{'1':{images:[output]}}}).state,'completed');
  assert.equal(normalizeVideoHistory({status:{completed:true},outputs:{}}).state,'failed');
  assert.throws(()=>normalizeVideoHistory({status:{completed:true},outputs:{'1':{images:[{...output,filename:'../x.mp4'}]}}}));
+});
+test('native Windows output folders normalize safely without accepting traversal or absolute paths',()=>{
+ assert.equal(safeVideoOutput({...output,subfolder:'ComfyStudio\\video'}).subfolder,'ComfyStudio/video');
+ for(const subfolder of ['..\\secret','C:\\secret','\\\\server\\share','video\\..\\secret','video/./x'])assert.throws(()=>safeVideoOutput({...output,subfolder}));
 });
