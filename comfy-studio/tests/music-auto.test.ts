@@ -1,0 +1,19 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {validateMusicInput} from '../lib/music/validation.ts';import {compileMusicWorkflow} from '../lib/music/workflow.ts';import {musicFormInput,musicCanSubmit} from '../lib/music/submission.ts';import {normalizeMusicHistory} from '../lib/music/jobs.ts';import {submitMusic} from '../lib/music/service.ts';
+const input={mode:'vocal' as const,prompt:'Warm piano ballad',lyrics:'[Verse]\n작은 빛 아래\n[Outro]\n우리 함께',language:'ko' as const,durationMode:'auto' as const,vocalGender:'female' as const};
+test('automatic music has no requested duration and preserves voice choice without reinterpreting legacy inputs',()=>{
+ assert.deepEqual(validateMusicInput(input),input);assert.throws(()=>validateMusicInput({...input,durationSeconds:30}));assert.throws(()=>validateMusicInput({...input,vocalGender:'forged'}));assert.throws(()=>validateMusicInput({...input,mode:'instrumental',lyrics:'',vocalGender:'female'}));
+ const legacy={mode:'vocal' as const,prompt:'Old prompt',lyrics:'Old lyrics',language:'ko' as const,durationSeconds:60};assert.deepEqual(validateMusicInput(legacy),legacy);assert.deepEqual(musicFormInput(legacy),{mode:'vocal',prompt:'Old prompt',lyrics:'Old lyrics',language:'ko',durationMode:'auto',vocalGender:'auto'});
+});
+test('automatic submission requires automatic-ending availability and new fixed-duration requests fail before GPU work',async()=>{
+ const availability={available:true,connected:true,maxSeconds:120,verified:true};assert.equal(musicCanSubmit(input,availability,false),false);assert.equal(musicCanSubmit(input,{...availability,autoEnding:true},false),true);
+ await assert.rejects(()=>submitMusic({mode:'vocal',prompt:'Old request',lyrics:'Old lyrics',language:'ko',durationSeconds:60},crypto.randomUUID()),{status:400});
+});
+test('automatic graph uses EOS-derived latent and gender guidance, with no fixed-duration latent node',async()=>{
+ const raw=JSON.parse(await readFile(new URL('./fixtures/music/workflow.json',import.meta.url),'utf8')),schema=JSON.parse(await readFile(new URL('./fixtures/music/node-info.json',import.meta.url),'utf8'));schema.ComfyStudioMusicAuto={input:{required:{clip:['CLIP'],tags:['STRING'],lyrics:['STRING'],language:['STRING'],seed:['INT']}},output:['CONDITIONING','LATENT','FLOAT']};
+ for(const gender of ['female','male','auto'] as const){const graph=compileMusicWorkflow(raw,{...input,vocalGender:gender},schema),nodes=Object.values(graph);assert.equal(nodes.some(n=>n.class_type==='EmptyAceStep1.5LatentAudio'),false);const encoder=nodes.find(n=>n.class_type==='ComfyStudioMusicAuto')!;assert.equal(encoder.inputs.lyrics,input.lyrics);assert.equal(encoder.inputs.duration,undefined);if(gender!=='auto')assert.match(String(encoder.inputs.tags),new RegExp(gender+' solo vocal'));const sampler=nodes.find(n=>n.class_type==='KSampler')!;const key=Object.entries(graph).find(([,n])=>n===encoder)![0];assert.deepEqual(sampler.inputs.latent_image,[key,1]);}
+});
+test('automatic history retains measured duration and turns missing-end failure into a clear error',()=>{
+ const audio={filename:'preview.mp3',subfolder:'ComfyStudio/music',type:'output'};const h={status:{completed:true},outputs:{saved:{audio:[audio]},auto:{music_auto:[{durationSeconds:73.4,ended:true,version:1}]}}};const done=normalizeMusicHistory(h);assert.equal(done.actualDurationSeconds,73.4);assert.equal(done.endingVerified,true);
+ const failed=normalizeMusicHistory({status:{status_str:'error',messages:[['execution_error',{node_type:'ComfyStudioMusicAuto',exception_message:'MUSIC_AUTO_NO_END'}]]}});assert.match(failed.error??'',/끝맺음/);
+ const plan=normalizeMusicHistory({status:{status_str:'error',messages:[['execution_error',{node_type:'ComfyStudioMusicAuto',exception_message:'MUSIC_AUTO_PLAN'}]]}});assert.match(plan.error??'',/가사.*짧게/);
+});

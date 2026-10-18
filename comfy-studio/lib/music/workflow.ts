@@ -14,6 +14,12 @@ export function compileMusicWorkflow(raw:unknown,input:MusicInput,info:NodeInfo,
  if(loader.inputs.ckpt_name!==MUSIC_CHECKPOINT||!Array.isArray(spec?.[0])||!spec[0].includes(MUSIC_CHECKPOINT))throw Error('승인된 음악 모델을 찾을 수 없습니다.');
  one('TextEncodeAceStepAudio1.5');one('EmptyAceStep1.5LatentAudio');const [,sampler]=one('KSampler');
  if(sampler.inputs.steps!==8||sampler.inputs.cfg!==1||sampler.inputs.sampler_name!=='euler'||sampler.inputs.scheduler!=='simple'||sampler.inputs.denoise!==1)throw Error('저장된 음악 샘플링 설정을 확인해 주세요.');
+ if(input.durationMode==='auto'){
+  const [encoderKey,encoder]=one('TextEncodeAceStepAudio1.5'),[emptyKey]=one('EmptyAceStep1.5LatentAudio');
+  const voice=input.mode==='vocal'&&input.vocalGender!=='auto'?`, ${input.vocalGender} solo vocal`:'';
+  graph[encoderKey]={class_type:'ComfyStudioMusicAuto',inputs:{clip:encoder.inputs.clip,tags:String(encoder.inputs.tags)+voice+', complete song, resolved outro, natural musical ending',lyrics:encoder.inputs.lyrics,language:input.language,seed,bpm:encoder.inputs.bpm,keyscale:encoder.inputs.keyscale,timesignature:encoder.inputs.timesignature}};
+  sampler.inputs.latent_image=[encoderKey,1];delete graph[emptyKey];
+ }
  const [decoderKey,decoder]=one('VAEDecodeAudio');graph[decoderKey]={class_type:'VAEDecodeAudioTiled',inputs:{...decoder.inputs,tile_size:512,overlap:64}};
  const [,save]=one('SaveAudioAdvanced');if(graph.studio_mp3)throw Error('음악 저장 노드가 충돌했습니다.');graph.studio_mp3={class_type:'SaveAudioMP3',inputs:{audio:save.inputs.audio,filename_prefix:'ComfyStudio/music/preview',quality:'320k'}};
  validateGraphModels(graph,info);return graph;
