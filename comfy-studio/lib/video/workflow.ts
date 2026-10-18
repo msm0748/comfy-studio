@@ -12,15 +12,18 @@ export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,
   if(type==='LoadImage')inputs.image=referenceFilename;
   if(type==='RandomNoise')inputs.noise_seed=randomInt(0,2**48-1);
   if(type==='CreateVideo')inputs.fps=24;
-  if(type==='SaveVideo')Object.assign(inputs,{filename_prefix:'ComfyStudio/video/'+input.resolution,format:'mp4','format.codec':'h264','format.codec.encoding':'auto'});
+  if(type==='SaveVideo')Object.assign(inputs,{filename_prefix:'ComfyStudio/video/'+((input.upscale??'fast')==='fast'?'original':input.resolution),format:'mp4','format.codec':'h264','format.codec.encoding':'auto'});
  }});
  const one=(type:string)=>{const entries=Object.entries(graph).filter(([,n])=>n.class_type===type);if(entries.length!==1)throw new Error('영상 워크플로 구조를 확인해 주세요: '+type);return entries[0];};
  const [,h3]=one('MiniMaxH3ImageToVideo');if(input.mode==='text')delete h3.inputs.first_frame;
  if(input.mode==='image'&&!h3.inputs.first_frame)throw new Error('영상 참조 연결이 없습니다.');
  const [decodeKey,decode]=one('VAEDecode');const [,video]=one('CreateVideo');
- if(input.resolution!=='480p'){
+ if(input.upscale==='ai'&&input.resolution!=='480p'){
   const [,sampler]=one('SamplerCustomAdvanced');const [,guider]=one('BasicGuider');const original=decode.inputs.samples;
   const add=(id:string,type:string,inputs:Record<string,unknown>):[string,number]=>{if(graph[id])throw new Error('영상 노드 번호가 충돌했습니다.');graph[id]={class_type:type,inputs};return [id,0];};
+  const nativeDecode=add('studio_original_decode','VAEDecode',{...decode.inputs});
+  const nativeVideo=add('studio_original_video','CreateVideo',{...video.inputs,images:nativeDecode});
+  const [,save]=one('SaveVideo');add('studio_original_save','SaveVideo',{...save.inputs,video:nativeVideo,filename_prefix:'ComfyStudio/video/original'});
   const split=add('studio_split','LTXVSeparateAVLatent',{av_latent:original});
   const modelName='minimax_h3_latent_upscaler_3d_conv_v1\\minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors';
   const up=add('studio_up','MinimaxH3LatentUpscaler3D',{latent:split,model_name:modelName,mode:'target dimensions','mode.width':1280,'mode.height':736,align:32,enable_temporal_chunking:true,force_unload:true,device:'cuda',precision:'bf16'});
@@ -33,6 +36,25 @@ export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,
   const crop=add('studio_crop','ImageCrop',{image:[decodeKey,0],width:1280,height:720,x:0,y:8});video.inputs.images=crop;
  }
  validateVideoGraph(graph,info);return graph;
+}
+export function compileVideoEnhancement(raw:unknown,input:VideoInput,info:NodeInfo,filename:string):ApiGraph{
+ if(!input.sourceJobId||input.upscale!=='ai'||filename!==`ComfyStudio/video-sources/${input.sourceJobId}.mp4`)throw new Error('안전한 원본 영상 입력을 확인해 주세요.');
+ const graph=compileVideoWorkflow(raw,{...input,mode:'text',referenceId:undefined,sourceJobId:undefined},info);
+ const [,videoVae]=Object.entries(graph).find(([,n])=>n.class_type==='VAEDecodeTiled')!;
+ const audioVae=Object.values(graph).find(n=>n.class_type==='VAEDecodeAudio')!.inputs.vae;
+ graph.studio_source_video={class_type:'LoadVideo',inputs:{file:filename}};
+ graph.studio_source_components={class_type:'GetVideoComponents',inputs:{video:['studio_source_video',0]}};
+ graph.studio_source_scale={class_type:'ImageScale',inputs:{image:['studio_source_components',0],upscale_method:'lanczos',width:864,height:480,crop:'center'}};
+ graph.studio_source_encoded_video={class_type:'VAEEncodeTiled',inputs:{pixels:['studio_source_scale',0],vae:videoVae.inputs.vae,tile_size:512,overlap:64,temporal_size:32,temporal_overlap:8}};
+ graph.studio_source_encoded_audio={class_type:'VAEEncodeAudio',inputs:{audio:['studio_source_components',1],vae:audioVae}};
+ graph.studio_source_encoded_av={class_type:'LTXVConcatAVLatent',inputs:{video_latent:['studio_source_encoded_video',0],audio_latent:['studio_source_encoded_audio',0]}};
+ graph.studio_split.inputs.av_latent=['studio_source_encoded_av',0];
+ Object.values(graph).find(n=>n.class_type==='CreateVideo')!.inputs.audio=['studio_source_components',1];
+ delete graph.studio_original_save;
+ const retained:ApiGraph={};function visit(key:string){if(retained[key])return;const node=graph[key];if(!node)throw new Error('영상 보정 연결을 확인해 주세요.');retained[key]=node;for(const value of Object.values(node.inputs))if(Array.isArray(value)&&typeof value[0]==='string'&&typeof value[1]==='number')visit(value[0]);}
+ for(const [key,node] of Object.entries(graph))if(node.class_type==='SaveVideo')visit(key);
+ if(Object.values(retained).some(node=>node.class_type==='SamplerCustomAdvanced'))throw new Error('원본 생성 단계가 보정에 연결되었습니다.');
+ validateVideoGraph(retained,info);return retained;
 }
 export function validateVideoGraph(graph:ApiGraph,info:NodeInfo):void{
  validateGraphModels(graph,info);

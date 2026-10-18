@@ -1,2 +1,2 @@
 import {requireAuth} from '@/lib/require-auth';import {apiError} from '@/lib/api';import {getVideoAvailability} from '@/lib/video/service';
-export async function GET(){try{await requireAuth();return Response.json(await getVideoAvailability(),{headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}
+export async function GET(request:Request){try{await requireAuth();const upscale=new URL(request.url).searchParams.get('upscale')??'fast';if(upscale!=='fast'&&upscale!=='ai')return Response.json({error:'확대 방식을 확인해 주세요.'},{status:400});return Response.json(await getVideoAvailability(upscale),{headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}

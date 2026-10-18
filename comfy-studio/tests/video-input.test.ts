@@ -17,3 +17,8 @@ test('video inputs reject invalid fields, missing references, invalid duration a
  assert.equal(image.mode,'image');
  for(const value of [null,[],false,{}])assert.throws(()=>validateVideoInput(value));
 });
+
+test('upscale choice is independent of resolution and source enhancement is validated',()=>{
+ assert.equal(validateVideoInput({...input,resolution:'720p',upscale:'fast'}).upscale,'fast');assert.equal(validateVideoInput({...input,resolution:'1080p',upscale:'ai'}).upscale,'ai');
+ for(const patch of [{upscale:'bad'},{upscale:'ai',resolution:'480p'},{sourceJobId:'bad',upscale:'ai',resolution:'720p'},{sourceJobId:'11111111-1111-4111-8111-111111111111',upscale:'fast',resolution:'720p'}])assert.throws(()=>validateVideoInput({...input,...patch}));
+});

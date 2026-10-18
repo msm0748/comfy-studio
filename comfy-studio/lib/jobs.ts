@@ -4,10 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { getPreset } from './presets.ts';
 import type { ApiGraph, GenerationInput, ImageRef, JobRecord, NodeInfo } from './types.ts';
 
-export class ServiceError extends Error {
-  status: number;
-  constructor(message:string,status=503){super(message);this.status=status;}
-}
+import {ServiceError} from './service-error.ts';
+export {ServiceError} from './service-error.ts';
 /** Preparation failed before /prompt was called, so acceptance is impossible. */
 export class PreparationError extends ServiceError {}
 export function assertJobId(id:string) {
