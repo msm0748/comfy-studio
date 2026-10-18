@@ -1,0 +1,5 @@
+import {validateMusicInput} from './validation.ts';import {HttpError} from '../submission.ts';import type {MusicInput,MusicJob,MusicAvailability} from './types.ts';
+export const isActiveMusic=(job:MusicJob|null)=>!!job&&['submitting','queued','running'].includes(job.state);
+export function createPendingMusic(input:MusicInput):MusicJob{return {id:crypto.randomUUID(),promptId:null,input:validateMusicInput(input),createdAt:new Date().toISOString(),state:'submitting'};}
+export function musicCanSubmit(input:MusicInput,availability:MusicAvailability|null,busy:boolean){try{validateMusicInput(input);return !busy&&availability?.available===true&&availability.connected&&input.durationSeconds<=availability.maxSeconds;}catch{return false;}}
+export async function submitOrRecoverMusic(pending:MusicJob,send:(job:MusicJob)=>Promise<MusicJob>,read:(id:string)=>Promise<MusicJob>):Promise<MusicJob>{try{return await send(pending);}catch(e){if(e instanceof HttpError&&e.status>=400&&e.status<500)return {...pending,state:'failed',error:e.message};try{return await read(pending.id);}catch{return {...pending,error:'노래 접수 상태를 확인하고 있습니다. 같은 작업 번호로 복구합니다.'};}}}
