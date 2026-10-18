@@ -29,6 +29,11 @@ export function createVideoJobService(deps:Deps){
  }
  return {
   read,
+  async retryFinalization(id:string):Promise<VideoJobRecord>{return locked(id,async()=>{
+   const job=await read(id);if(job.state==='completed'||job.state==='processing')return job;
+   if(job.state!=='failed'||!job.sourceOutput)throw new ServiceError('저장된 원본이 있는 영상만 다시 처리할 수 있습니다.',409);
+   const next={...job,state:'processing' as const,phase:'encoding' as const,error:undefined};await save(next);finalize(next);return next;
+  });},
   async submit(raw:VideoInput,id:string):Promise<VideoJobRecord>{const input=validateVideoInput(raw);return locked(id,async()=>{
    await mkdir(deps.directory,{recursive:true});const preset=getVideoPreset(input.resolution),frames=videoFrames(input.durationSeconds);
    let job:VideoJobRecord={id,promptId:null,input,createdAt:new Date().toISOString(),state:'submitting',phase:'generation',generationWidth:864,generationHeight:480,width:preset.width,height:preset.height,frames,fps:24,actualDurationSeconds:frames/24};

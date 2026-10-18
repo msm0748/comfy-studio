@@ -3,6 +3,13 @@ import {compileVideoWorkflow} from '../lib/video/workflow.ts';
 import type {NodeInfo} from '../lib/types.ts';
 const fixture=async(name:string)=>JSON.parse(await readFile(new URL('./fixtures/video/'+name+'.json',import.meta.url),'utf8'));
 const schema:NodeInfo=await fixture('node-info');
+
+test('changed widget schema order fails before an invalid workflow can be submitted',async()=>{
+ const changed=structuredClone(schema),fields=changed.BasicScheduler.input.required!;
+ changed.BasicScheduler.input.required={model:fields.model,scheduler:fields.scheduler,denoise:fields.denoise,steps:fields.steps};
+ const raw=await fixture('text');
+ assert.throws(()=>compileVideoWorkflow(raw,{mode:'text',prompt:'x',resolution:'480p',durationSeconds:7},changed),/스키마|입력/);
+});
 test('video graph binds prompt and frames; optional image is absent for text and genuine for image',async()=>{
  const input={mode:'text' as const,prompt:'A red mug',resolution:'480p' as const,durationSeconds:10};
  const graph=compileVideoWorkflow(await fixture('text'),input,schema);

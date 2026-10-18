@@ -13,3 +13,9 @@ test('late reference response cannot replace the most recently selected referenc
  const waits:((r:ReferenceRecord)=>void)[]=[];const loader=createVideoReferenceLoader(()=>new Promise<ReferenceRecord>(resolve=>waits.push(resolve)));
  const first=loader.load('first'),second=loader.load('second');const reference={id:'second',width:100,height:100,createdAt:''};waits[1](reference);assert.deepEqual(await second,reference);waits[0]({...reference,id:'first'});assert.equal(await first,null);
 });
+
+test('reference reconnect retries the failed source and invalidation prevents unrelated retry',async()=>{
+ let fail=true,calls=0;const reference={id:'reference',width:100,height:100,createdAt:''};
+ const loader=createVideoReferenceLoader(async id=>{calls++;assert.equal(id,'source:job');if(fail)throw Error('offline');return reference;});
+ await assert.rejects(()=>loader.load('source:job'));fail=false;assert.deepEqual(await loader.retry(),reference);assert.equal(calls,2);loader.invalidate();assert.equal(await loader.retry(),null);assert.equal(calls,2);
+});

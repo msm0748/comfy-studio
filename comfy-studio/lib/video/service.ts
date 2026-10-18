@@ -30,5 +30,6 @@ export async function submitVideo(input:VideoInput,id:string){
  return jobs.submit(input,id);
 }
 export const getVideoJob=jobs.get;
+export const retryVideoFinalization=jobs.retryFinalization;
 export const getVideoRecord=jobs.read;
 export async function getVideoMedia(id:string,request:Request){return media.serve(await jobs.read(id),request);}

@@ -26,3 +26,13 @@ test('native Windows output folders normalize safely without accepting traversal
  assert.equal(safeVideoOutput({...output,subfolder:'ComfyStudio\\video'}).subfolder,'ComfyStudio/video');
  for(const subfolder of ['..\\secret','C:\\secret','\\\\server\\share','video\\..\\secret','video/./x'])assert.throws(()=>safeVideoOutput({...output,subfolder}));
 });
+
+test('explicit finalization retry uses persisted source across restart without another generation',async()=>{
+ const directory=await mkdtemp(path.resolve('.data/test-tmp/video-'));let sent=0,broken=true;
+ const deps={directory,submit:async()=>{sent++;return 'original';},inspect:async()=>({state:'completed' as const,output}),recover:async()=>null,finalize:async()=>{if(broken)throw Error('temporary encoder failure');return {kind:'comfy' as const,ref:output};}};
+ try{let service=createVideoJobService(deps);const id=randomUUID();await service.submit(input,id);let job=await service.get(id);
+  for(let n=0;n<30&&job.state!=='failed';n++){await new Promise(r=>setTimeout(r,5));job=await service.get(id);}assert.equal(job.state,'failed');assert.deepEqual(job.sourceOutput,output);
+  broken=false;service=createVideoJobService(deps);await service.retryFinalization(id);job=await service.get(id);
+  for(let n=0;n<30&&job.state!=='completed';n++){await new Promise(r=>setTimeout(r,5));job=await service.get(id);}assert.equal(job.state,'completed');assert.equal(job.promptId,'original');assert.equal(sent,1);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});

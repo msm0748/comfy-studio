@@ -12,7 +12,7 @@ const controls = new Set(['randomize','fixed','increment','decrement']);
 const linksOf = (graph:UiGraph):Link[] => graph.links.map(link => Array.isArray(link) ? {id:link[0],origin_id:link[1],origin_slot:link[2],target_id:link[3],target_slot:link[4]} : link);
 
 
-function widgetInputs(node:UiNode, info:NodeInfo[string] | undefined):Record<string,unknown> {
+function widgetInputs(node:UiNode, info:NodeInfo[string] | undefined,strictSchema=false):Record<string,unknown> {
   const values=node.widgets_values || [];
   let cursor=0;
   const result:Record<string,unknown>={};
@@ -32,12 +32,15 @@ function widgetInputs(node:UiNode, info:NodeInfo[string] | undefined):Record<str
     }
   };
   if(info) {consume(info.input.required || {});consume(info.input.optional || {});}
+  const saved=(node.inputs||[]).filter(p=>p.widget&&Object.hasOwn(result,p.name)).map(p=>p.name);
+  const live=Object.keys(result).filter(name=>strictSchema||saved.includes(name));
+  if(saved.length&&(saved.length!==live.length||saved.some((name,index)=>name!==live[index])))throw new Error(`저장된 워크플로 입력 스키마가 변경되었습니다: ${node.type}`);
   return result;
 }
 
 /** Traverses registered templates, resolves saved subgraphs and switches, and discards unreachable helpers. */
 export type StoredPatch={key:string;nodeId:number;type:string;inputs:Record<string,unknown>;nested:boolean;widgets:unknown[]};
-export function compileStoredGraph(raw:unknown,nodeInfo:NodeInfo,options:{outputTypes:string[];patch:(context:StoredPatch)=>void}):ApiGraph {
+export function compileStoredGraph(raw:unknown,nodeInfo:NodeInfo,options:{outputTypes:string[];strictSchema?:boolean;patch:(context:StoredPatch)=>void}):ApiGraph {
   const workflow=structuredClone(raw) as Workflow;
   if(!workflow?.nodes?.length || !Array.isArray(workflow.links)) throw new Error('저장된 워크플로 형식을 확인해 주세요.');
   const definitions=new Map((workflow.definitions?.subgraphs || []).map(g=>[g.id,g]));
@@ -89,7 +92,7 @@ export function compileStoredGraph(raw:unknown,nodeInfo:NodeInfo,options:{output
     if(building.has(key)) throw new Error('순환 워크플로는 지원하지 않습니다.');
     building.add(key);
     if(node.mode===2 || node.mode===4) throw new Error('비활성 노드가 연결된 워크플로는 지원하지 않습니다.');
-    const inputs=widgetInputs(node,nodeInfo[node.type]);
+    const inputs=widgetInputs(node,nodeInfo[node.type],options.strictSchema);
     for(const port of node.inputs || []) {
       if(port.link!=null) {
         const value=linked(context,port.link);
@@ -108,6 +111,13 @@ export function compileStoredGraph(raw:unknown,nodeInfo:NodeInfo,options:{output
     if(result[key]) return;
     const node=graph[key];
     if(!node || !nodeInfo[node.class_type]) throw new Error(`필요한 노드가 없습니다: ${node?.class_type || key}`);
+    const schema={...nodeInfo[node.class_type].input.required,...nodeInfo[node.class_type].input.optional};
+    for(const [name,spec] of Object.entries(schema)){
+      const value=node.inputs[name];if(value===undefined||isRef(value))continue;
+      const [type,configRaw]=spec;const config=(configRaw||{}) as Record<string,unknown>;
+      if((type==='INT'||type==='FLOAT')&&(typeof value!=='number'||!Number.isFinite(value)||(type==='INT'&&!Number.isInteger(value))||(typeof config.min==='number'&&value<config.min)||(typeof config.max==='number'&&value>config.max)))throw new Error(`워크플로 숫자 입력을 확인해 주세요: ${node.class_type}.${name}`);
+      if((type==='BOOLEAN'&&typeof value!=='boolean')||(type==='STRING'&&typeof value!=='string'))throw new Error(`워크플로 입력 형식을 확인해 주세요: ${node.class_type}.${name}`);
+    }
     result[key]=node;
     for(const value of Object.values(node.inputs)) if(isRef(value)) visit(value[0]);
   }

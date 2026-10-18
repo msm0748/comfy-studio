@@ -7,7 +7,7 @@ export async function loadVideoWorkflow(mode:VideoMode):Promise<unknown>{const r
 export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,referenceFilename?:string):ApiGraph{
  validateVideoInput(input);
  if(input.mode==='image'&&referenceFilename!==`ComfyStudio/references/${input.referenceId}.png`)throw new Error('안전한 영상 참조 이미지를 확인해 주세요.');
- const graph=compileStoredGraph(raw,info,{outputTypes:['SaveVideo'],patch:({type,inputs})=>{
+ const graph=compileStoredGraph(raw,info,{outputTypes:['SaveVideo'],strictSchema:true,patch:({type,inputs})=>{
   if(type==='MiniMaxH3ImageToVideo')Object.assign(inputs,{prompt:input.prompt,width:864,height:480,length:videoFrames(input.durationSeconds)});
   if(type==='LoadImage')inputs.image=referenceFilename;
   if(type==='RandomNoise')inputs.noise_seed=randomInt(0,2**48-1);
