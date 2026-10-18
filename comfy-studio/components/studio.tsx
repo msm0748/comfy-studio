@@ -7,6 +7,7 @@ import { restoreEditorState } from '@/lib/editor-state';
 import { validateGenerationInput } from '@/lib/validation';
 import { HttpError, canGenerate, createPendingJob, disableModels, isActiveJob, restorePendingJob, submitOrRecover } from '@/lib/submission';
 import { StudioNav } from './studio-nav';
+import { StudioFooter } from './studio-footer';
 import { GenerationForm } from './generation-form';
 import { GenerationResult } from './generation-result';
 import { ImageLightbox } from './image-lightbox';
@@ -261,8 +262,7 @@ export function Studio() {
           <GenerationResult key={result?.id??'empty'} job={job} result={result} elapsed={elapsed} error={error} onIdea={chooseIdea}
             onExpand={(src,alt) => setExpanded({src,alt})} onContinue={value=>void prepareReference(value)} mode={mode} onReconnect={reconnect} busy={busy} />
         </div>
-        <footer className="studio-footer"><span>LESS SETUP. MORE IMAGINATION.</span>
-          <span>나만의 크리에이티브 스튜디오 <span className="footer-dot">✦</span></span></footer>
+        <StudioFooter />
       </main>
     </div>
     {expanded && <ImageLightbox src={expanded.src} alt={expanded.alt} onClose={() => setExpanded(null)} />}
