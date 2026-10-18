@@ -1,7 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createPendingVideo,submitOrRecoverVideo,videoCanSubmit,createVideoReferenceLoader} from '../lib/video/submission.ts';
+import {createPendingVideo,submitOrRecoverVideo,videoCanSubmit,createVideoReferenceLoader,videoSubmissionRequest} from '../lib/video/submission.ts';
 import type {VideoAvailability} from '../lib/video/types.ts';import type {ReferenceRecord} from '../lib/types.ts';
 const input={mode:'text' as const,prompt:'A mug',resolution:'480p' as const,durationSeconds:10};
+test('stale availability cannot enable a different upscale choice and child retries use the enhance endpoint',()=>{
+ const ai={...input,resolution:'720p' as const,durationSeconds:7,upscale:'ai' as const};const fast={connected:true,upscale:'fast',modes:[{id:'text',available:true,presets:[{id:'720p',available:true,maxSeconds:7}]}]} as VideoAvailability;
+ assert.equal(videoCanSubmit(ai,fast,false),false);assert.equal(videoCanSubmit(ai,{...fast,upscale:'ai'},false),true);
+ const job=createPendingVideo({...ai,sourceJobId:'11111111-1111-4111-8111-111111111111'});assert.deepEqual(videoSubmissionRequest(job),{url:'/api/videos/11111111-1111-4111-8111-111111111111/enhance',body:{resolution:'720p'}});assert.deepEqual(videoSubmissionRequest(createPendingVideo(input)),{url:'/api/videos',body:input});
+});
 test('video response loss recovers the same identity and invalid resolution change never silently trims duration',async()=>{
  const pending=createPendingVideo(input);let sent=0;
  const restored=await submitOrRecoverVideo(pending,async()=>{sent++;throw Error('response lost');},async id=>({...pending,id,promptId:'accepted',state:'queued'}));assert.equal(restored.id,pending.id);assert.equal(restored.promptId,'accepted');assert.equal(sent,1);

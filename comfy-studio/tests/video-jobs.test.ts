@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,mkdir} from 'node:fs/promises';import path from 'node:path';import {randomUUID} from 'node:crypto';
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';import path from 'node:path';import {randomUUID} from 'node:crypto';
 import {createVideoJobService,normalizeVideoHistory,safeVideoOutput} from '../lib/video/jobs.ts';import {PreparationError} from '../lib/jobs.ts';
 const input={mode:'text' as const,prompt:'빨간 머그컵',resolution:'480p' as const,durationSeconds:7};
 const output={filename:'clip.mp4',subfolder:'ComfyStudio/video',type:'output' as const};
@@ -8,8 +8,17 @@ test('video jobs preserve original settings across restart and never submit the 
  const deps={directory,submit:async()=>{sent++;return 'prompt';},inspect:async()=>({state:'completed' as const,output}),recover:async()=>null,finalize:async()=>({kind:'comfy' as const,ref:output})};
  try{const service=createVideoJobService(deps),id=randomUUID();const [a,b]=await Promise.all([service.submit(input,id),service.submit(input,id)]);assert.equal(a.promptId,b.promptId);assert.equal(sent,1);
   await assert.rejects(()=>service.submit({...input,durationSeconds:6},id),{status:409});
-  const restored=createVideoJobService(deps);let job=await restored.get(id);assert.deepEqual(job.input,input);
+  const restored=createVideoJobService(deps);let job=await restored.get(id);assert.deepEqual(job.input,{...input,upscale:'fast'});
   for(let n=0;n<10&&job.state!=='completed';n++){await new Promise(r=>setTimeout(r,5));job=await restored.get(id);}assert.equal(job.state,'completed');assert.equal(sent,1);assert.equal(job.frames,175);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('new jobs retain raw source and old idempotent requests are not reinterpreted as fast output',async()=>{
+ const directory=await mkdtemp(path.resolve('.data/test-tmp/video-'));let sent=0;
+ const deps={directory,submit:async()=>{sent++;return 'prompt';},inspect:async()=>({state:'completed' as const,output}),recover:async()=>null,finalize:async()=>({kind:'comfy' as const,ref:output})};
+ try{const service=createVideoJobService(deps),fresh=await service.submit({...input,resolution:'720p'},randomUUID());assert.equal(fresh.input.upscale,'fast');const native=await service.get(fresh.id);assert.deepEqual(native.originalOutput,output);
+  let complete=await service.get(fresh.id);for(let n=0;n<30&&complete.state!=='completed';n++){await new Promise(r=>setTimeout(r,5));complete=await service.get(fresh.id);}
+  const id=randomUUID(),legacy={...fresh,id,input:{...input,resolution:'720p' as const},state:'completed',sourceOutput:output};await writeFile(path.join(directory,id+'.json'),JSON.stringify(legacy));assert.equal((await service.submit(legacy.input,id)).input.upscale,undefined);await assert.rejects(()=>service.submit({...legacy.input,upscale:'fast'},id),{status:409});assert.equal(sent,1);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 test('preparation failure is terminal while ambiguous submission recovers the original prompt',async()=>{
@@ -25,6 +34,10 @@ test('video history rejects unsafe output and completed jobs without video',()=>
 test('native Windows output folders normalize safely without accepting traversal or absolute paths',()=>{
  assert.equal(safeVideoOutput({...output,subfolder:'ComfyStudio\\video'}).subfolder,'ComfyStudio/video');
  for(const subfolder of ['..\\secret','C:\\secret','\\\\server\\share','video\\..\\secret','video/./x'])assert.throws(()=>safeVideoOutput({...output,subfolder}));
+});
+
+test('video history distinguishes the retained original and ignores input-video preview media',()=>{
+ const final={...output,filename:'enhanced.mp4'};const inspected=normalizeVideoHistory({status:{completed:true},outputs:{studio_source_video:{videos:[{...output,type:'input'}]},studio_original_save:{images:[output]},final:{images:[final]}}});assert.deepEqual(inspected,{state:'completed',output:final,originalOutput:output});
 });
 
 test('explicit finalization retry uses persisted source across restart without another generation',async()=>{
