@@ -16,7 +16,8 @@ export function createVideoMediaService(overrides:{directory?:string;fetch?:type
    return new Response(input.method==='HEAD'?null:upstream.body,{status:upstream.status,headers});
   }
   assertJobId(job.id);if(job.media.filename!==job.id+'.mp4')throw new ServiceError('안전하지 않은 영상 파일입니다.',400);
-  const file=path.join(directory,job.media.filename);let size:number;try{size=(await stat(file)).size;}catch{throw new ServiceError('영상 파일을 찾을 수 없습니다.',404);}
+  // Generated media exists only at runtime; exclude it from build dependency tracing.
+  const file=path.join(/*turbopackIgnore: true*/ directory,job.media.filename);let size:number;try{size=(await stat(/*turbopackIgnore: true*/ file)).size;}catch{throw new ServiceError('영상 파일을 찾을 수 없습니다.',404);}
   let start=0,end=size-1,status=200;
   if(range){const m=/^bytes=(\d*)-(\d*)$/.exec(range);if(!m||(!m[1]&&!m[2]))return new Response(null,{status:416,headers:{...Object.fromEntries(headers),'Content-Range':`bytes */${size}`}});
    if(!m[1]){const suffix=Number(m[2]);start=Math.max(0,size-suffix);if(suffix<=0)start=size;}else{start=Number(m[1]);end=m[2]?Math.min(Number(m[2]),size-1):size-1;}
@@ -25,6 +26,6 @@ export function createVideoMediaService(overrides:{directory?:string;fetch?:type
   }
   headers.set('Content-Length',String(Math.max(0,end-start+1)));
   if(input.method==='HEAD')return new Response(null,{status,headers});
-  const stream=createReadStream(file,{start,end,signal:input.signal});return new Response(Readable.toWeb(stream) as ReadableStream,{status,headers});
+  const stream=createReadStream(/*turbopackIgnore: true*/ file,{start,end,signal:input.signal});return new Response(Readable.toWeb(stream) as ReadableStream,{status,headers});
  }};
 }
