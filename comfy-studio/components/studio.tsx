@@ -239,11 +239,6 @@ export function Studio() {
 
   return <>
     <StudioNav connected={connected} />
-    <div className="studio-shell">
-      <aside className="tool-rail" aria-label="현재 작업 공간">
-        <span className="rail-active" title="이미지 스튜디오"><Icon name="image" size={21} /></span>
-        <span className="rail-line" /><span className="rail-label">CREATE</span><span className="rail-bottom">CS</span>
-      </aside>
       <main className="studio-main">
         <div className="page-heading">
           <div><div className="heading-eyebrow"><span />YOUR PERSONAL CREATIVE SPACE</div>
@@ -264,7 +259,6 @@ export function Studio() {
         </div>
         <StudioFooter />
       </main>
-    </div>
     {expanded && <ImageLightbox src={expanded.src} alt={expanded.alt} onClose={() => setExpanded(null)} />}
   </>;
 }
