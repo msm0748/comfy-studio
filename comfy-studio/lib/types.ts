@@ -1,4 +1,4 @@
-export type ModelId = 'z-image' | 'qwen-2512' | 'krea-2' | 'qwen-edit-2511' | 'z-image-edit';
+export type ModelId = 'z-image' | 'qwen-2512' | 'krea-2' | 'moss-image' | 'qwen-edit-2511' | 'z-image-edit';
 export type StudioMode = 'generate' | 'edit';
 export type SizeId = 'square' | 'portrait' | 'landscape' | 'wide' | 'tall';
 export type SizeOption = { id: SizeId; label: string; use: string; width: number; height: number; recommended?: boolean };
