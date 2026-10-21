@@ -1,3 +1,4 @@
+import {withVideoRealism} from '../realism.ts';
 import type {VideoInput,VideoMode,VideoInspection,VideoOutputRef} from './types.ts';import type {NodeInfo} from '../types.ts';
 import {PreparationError,ServiceError,assertJobId} from '../jobs.ts';import {compileVideoWorkflow,compileVideoEnhancement} from './workflow.ts';import {normalizeVideoHistory,safeVideoOutput} from './jobs.ts';
 import {mkdir,unlink} from 'node:fs/promises';import {createWriteStream,openAsBlob} from 'node:fs';import path from 'node:path';import {randomUUID} from 'node:crypto';import {Readable,Transform} from 'node:stream';import {pipeline} from 'node:stream/promises';
@@ -24,7 +25,7 @@ export function createVideoClient(deps:Deps){
     const filename=input.referenceId?`ComfyStudio/references/${input.referenceId}.png`:undefined;
     const sourceFilename=input.sourceJobId?`ComfyStudio/video-sources/${input.sourceJobId}.mp4`:undefined;
     if(sourceFilename)compileVideoEnhancement(raw,input,info,sourceFilename);else compileVideoWorkflow(raw,input,info,filename);
-    const translated=await deps.translate(input.prompt);
+    const translated=withVideoRealism(await deps.translate(input.prompt));
     if(input.sourceJobId)await uploadSource(input.sourceJobId);
     else if(input.referenceId){const form=new FormData();form.set('image',new Blob([new Uint8Array(await deps.reference(input.referenceId))],{type:'image/png'}),input.referenceId+'.png');form.set('subfolder','ComfyStudio/references');form.set('type','input');form.set('overwrite','true');const uploaded=await(await request('/upload/image',{method:'POST',body:form})).json();if(uploaded.name!==input.referenceId+'.png'||uploaded.subfolder!=='ComfyStudio/references'||uploaded.type!=='input')throw Error('참조 이미지 업로드를 확인하지 못했습니다.');}
     graph=sourceFilename?compileVideoEnhancement(raw,{...input,prompt:translated},info,sourceFilename):compileVideoWorkflow(raw,{...input,prompt:translated},info,filename);

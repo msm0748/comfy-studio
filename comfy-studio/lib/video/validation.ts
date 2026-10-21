@@ -1,4 +1,4 @@
-import {getVideoPreset} from './presets.ts';
+import {getVideoPreset,VIDEO_AI_MAX_SECONDS} from './presets.ts';
 import type {VideoInput,VideoMode,VideoResolution} from './types.ts';
 export function videoInputIssue(input:VideoInput):string|null{try{validateVideoInput(input);return null;}catch(error){return error instanceof Error?error.message:'영상 설정을 확인해 주세요.';}}
 export function validateVideoInput(raw:unknown):VideoInput{
@@ -12,6 +12,7 @@ export function validateVideoInput(raw:unknown):VideoInput{
  const result:VideoInput={mode:data.mode as VideoMode,prompt:data.prompt.trim(),resolution:preset.id,durationSeconds:data.durationSeconds};
  if(data.upscale!==undefined){if(data.upscale!=='fast'&&data.upscale!=='ai')throw new Error('확대 방식을 다시 선택해 주세요.');result.upscale=data.upscale;}
  if(result.upscale==='ai'&&result.resolution==='480p')throw new Error('AI 보정은 720p 또는 1080p로 선택해 주세요.');
+ if(result.upscale==='ai'&&result.durationSeconds>VIDEO_AI_MAX_SECONDS)throw new Error(`AI 보정은 ${VIDEO_AI_MAX_SECONDS}초 이하 영상에서만 사용할 수 있어요.`);
  if(data.sourceJobId!==undefined){if(typeof data.sourceJobId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.sourceJobId)||result.upscale!=='ai')throw new Error('보정할 원본 영상 작업을 확인해 주세요.');result.sourceJobId=data.sourceJobId;}
  if(result.mode==='image'){
   if(typeof data.referenceId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.referenceId))throw new Error('참조 이미지를 먼저 선택해 주세요.');
