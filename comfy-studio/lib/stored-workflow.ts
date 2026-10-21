@@ -57,8 +57,14 @@ export function compileStoredGraph(raw:unknown,nodeInfo:NodeInfo,options:{output
       const port=parent.node.inputs?.find(p=>p.name===name);
       if(port?.link!=null) return linked(parent.context,port.link);
       const values=parent.node.widgets_values || [];
-      const widgets=(parent.node.inputs || []).filter(p=>p.widget);
-      const index=widgets.findIndex(p=>p.name===name);
+      const ports=parent.node.inputs || [];
+      const widgets=ports.filter(p=>p.widget);
+      let index=widgets.findIndex(p=>p.name===name);
+      // Newer saves keep one value per promoted subgraph input (socket-only inputs excluded), not per widget port.
+      if(values.length!==widgets.length) {
+        const order=(context.graph.inputs || []).map(i=>i.name).filter(n=>!ports.some(p=>p.name===n&&!p.widget));
+        index=order.length===values.length ? order.indexOf(name ?? '') : -1;
+      }
       if(index>=0 && index<values.length) return values[index];
       return undefined; // Preserve the destination's saved widget when an exposure has no override.
     }
