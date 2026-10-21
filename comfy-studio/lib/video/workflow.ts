@@ -1,13 +1,15 @@
 import {readFile} from 'node:fs/promises';import path from 'node:path';import {randomInt} from 'node:crypto';
 import {compileStoredGraph} from '../stored-workflow.ts';import {validateGraphModels} from '../jobs.ts';
-import type {ApiGraph,NodeInfo} from '../types.ts';import type {VideoInput,VideoMode} from './types.ts';
+import type {ApiGraph,NodeInfo} from '../types.ts';import type {VideoInput,VideoMode,VideoModel} from './types.ts';
 import {videoFrames} from './presets.ts';import {validateVideoInput} from './validation.ts';
-const FILES={text:'MiniMax-H3-T2V-7s-Single-Shot.json',image:'MiniMax-H3-I2V-7s-RTX3090.json'};
-export async function loadVideoWorkflow(mode:VideoMode):Promise<unknown>{const root=process.env.COMFYUI_WORKFLOW_DIR||'C:/ComfyUI/ComfyUI_windows_portable/ComfyUI/user/default/workflows';return JSON.parse((await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root,FILES[mode]),'utf8')).replace(/^\uFEFF/,''));}
+const FILES:Record<VideoModel,Record<VideoMode,string>>={h3:{text:'MiniMax-H3-T2V-7s-Single-Shot.json',image:'MiniMax-H3-I2V-7s-RTX3090.json'},fasth3:{text:'FastH3-T2V-8step.json',image:'FastH3-I2V-8step.json'}};
+export const FASTH3_UNET='fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors';
+export async function loadVideoWorkflow(mode:VideoMode,model:VideoModel='h3'):Promise<unknown>{const root=process.env.COMFYUI_WORKFLOW_DIR||'C:/ComfyUI/ComfyUI_windows_portable/ComfyUI/user/default/workflows';return JSON.parse((await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root,FILES[model][mode]),'utf8')).replace(/^\uFEFF/,''));}
 export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,referenceFilename?:string):ApiGraph{
  validateVideoInput(input);
  if(input.mode==='image'&&referenceFilename!==`ComfyStudio/references/${input.referenceId}.png`)throw new Error('안전한 영상 참조 이미지를 확인해 주세요.');
- const graph=compileStoredGraph(raw,info,{outputTypes:['SaveVideo'],strictSchema:true,patch:({type,inputs})=>{
+ // FastH3's official template lists only linked widget inputs, so strict matching cannot apply; patchFastH3 pins the values that matter.
+ const graph=compileStoredGraph(raw,info,{outputTypes:['SaveVideo'],strictSchema:input.model!=='fasth3',patch:({type,inputs})=>{
   if(type==='MiniMaxH3ImageToVideo')Object.assign(inputs,{prompt:input.prompt,width:864,height:480,length:videoFrames(input.durationSeconds)});
   if(type==='LoadImage')inputs.image=referenceFilename;
   if(type==='RandomNoise')inputs.noise_seed=randomInt(0,2**48-1);
@@ -17,6 +19,7 @@ export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,
  const one=(type:string)=>{const entries=Object.entries(graph).filter(([,n])=>n.class_type===type);if(entries.length!==1)throw new Error('영상 워크플로 구조를 확인해 주세요: '+type);return entries[0];};
  const [,h3]=one('MiniMaxH3ImageToVideo');if(input.mode==='text')delete h3.inputs.first_frame;
  if(input.mode==='image'&&!h3.inputs.first_frame)throw new Error('영상 참조 연결이 없습니다.');
+ if(input.model==='fasth3')patchFastH3(graph);
  const [decodeKey,decode]=one('VAEDecode');const [,video]=one('CreateVideo');
  if(input.upscale==='ai'&&input.resolution!=='480p'){
   const [,sampler]=one('SamplerCustomAdvanced');const [,guider]=one('BasicGuider');const original=decode.inputs.samples;
@@ -56,9 +59,21 @@ export function compileVideoEnhancement(raw:unknown,input:VideoInput,info:NodeIn
  if(Object.values(retained).some(node=>node.class_type==='SamplerCustomAdvanced'))throw new Error('원본 생성 단계가 보정에 연결되었습니다.');
  validateVideoGraph(retained,info);return retained;
 }
+// The stored FastH3 template's subgraph widgets map loader names off by one, so loaders are set by role.
+// Sparse attention is removed: dense attention matched H3's quality in the 2026-10-22 same-seed test (+18s).
+function patchFastH3(graph:ApiGraph):void{
+ for(const [key,node] of Object.entries(graph)){
+  if(node.class_type==='UNETLoader')node.inputs.unet_name=FASTH3_UNET;
+  if(node.class_type==='CLIPLoader')node.inputs.clip_name='qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors';
+  if(node.class_type==='ModelAttentionBackend')node.inputs.attention='comfy kitchen attention';
+  if(node.class_type==='VAELoader'){const audio=Object.values(graph).some(n=>n.class_type==='VAEDecodeAudio'&&Array.isArray(n.inputs.vae)&&n.inputs.vae[0]===key);node.inputs.vae_name=audio?'minimax_h3_audio_vae_fp32.safetensors':'minimax_h3_video_vae_int8_convrot.safetensors';}
+ }
+ for(const [key,node] of Object.entries(graph))if(node.class_type==='BlockSparseAttention'){for(const other of Object.values(graph))for(const [name,value] of Object.entries(other.inputs))if(Array.isArray(value)&&value[0]===key)other.inputs[name]=node.inputs.model;delete graph[key];}
+ if(!Object.values(graph).some(n=>n.class_type==='UNETLoader'&&n.inputs.unet_name===FASTH3_UNET))throw new Error('FastH3 워크플로 구조를 확인해 주세요.');
+}
 export function validateVideoGraph(graph:ApiGraph,info:NodeInfo):void{
  validateGraphModels(graph,info);
- const allowed={unet_name:['minimax_h3_fl2va_pruned_int8_convrot.safetensors'],clip_name:['qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors'],vae_name:['minimax_h3_video_vae_int8_convrot.safetensors','minimax_h3_video_vae_fp16.safetensors','minimax_h3_audio_vae_fp32.safetensors']};
+ const allowed={unet_name:['minimax_h3_fl2va_pruned_int8_convrot.safetensors',FASTH3_UNET],clip_name:['qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors'],vae_name:['minimax_h3_video_vae_int8_convrot.safetensors','minimax_h3_video_vae_fp16.safetensors','minimax_h3_audio_vae_fp32.safetensors']};
  for(const node of Object.values(graph)){
   for(const [key,values] of Object.entries(allowed))if(key in node.inputs&&!values.includes(String(node.inputs[key])))throw new Error('승인되지 않은 영상 모델입니다.');
   if(node.class_type==='MinimaxH3LatentUpscaler3D'){
