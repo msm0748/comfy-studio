@@ -9,7 +9,9 @@ export const IMAGE_REALISM='Authentic candid photograph, unretouched, realistic 
 export function withImageRealism(prompt:string):string{return isStylized(prompt)?prompt:join(prompt,IMAGE_REALISM);}
 
 export const VIDEO_REALISM='Looks like real live-action camera footage: natural unhurried motion with physically plausible weight, subtle handheld camera movement, natural motion blur, natural lighting, true-to-life colors, real skin texture, subtle film grain.';
-export function withVideoRealism(prompt:string):string{return isStylized(prompt)?prompt:join(prompt,VIDEO_REALISM);}
+// FastH3 drifts toward saturated, busy frames; this cue brought it back to H3's look in the 2026-10-22 same-seed test.
+export const FASTH3_LOOK='Natural muted colors, soft low contrast, gentle highlights, simple uncluttered background.';
+export function withVideoRealism(prompt:string,model:'h3'|'fasth3'='h3'):string{return isStylized(prompt)?prompt:join(prompt,model==='fasth3'?VIDEO_REALISM+' '+FASTH3_LOOK:VIDEO_REALISM);}
 
 // ACE-Step reads tags as a caption; genre-neutral cues avoid conflicting styles, which degrade output.
 export function withMusicRealism(style:string,mode:'vocal'|'instrumental'):string{

@@ -4,7 +4,7 @@ export function videoInputIssue(input:VideoInput):string|null{try{validateVideoI
 export function validateVideoInput(raw:unknown):VideoInput{
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('영상 입력을 확인해 주세요.');
  const data=raw as Record<string,unknown>;
- if(Object.keys(data).some(k=>!['mode','prompt','resolution','durationSeconds','referenceId','upscale','sourceJobId'].includes(k)))throw new Error('지원하지 않는 영상 설정입니다.');
+ if(Object.keys(data).some(k=>!['mode','prompt','resolution','durationSeconds','referenceId','upscale','sourceJobId','model'].includes(k)))throw new Error('지원하지 않는 영상 설정입니다.');
  if(!['text','image'].includes(String(data.mode)))throw new Error('영상 생성 방식을 다시 선택해 주세요.');
  if(typeof data.prompt!=='string'||!data.prompt.trim()||data.prompt.trim().length>8000)throw new Error('프롬프트는 1~8,000자로 입력해 주세요.');
  const preset=getVideoPreset(data.resolution as VideoResolution);
@@ -13,6 +13,7 @@ export function validateVideoInput(raw:unknown):VideoInput{
  if(data.upscale!==undefined){if(data.upscale!=='fast'&&data.upscale!=='ai')throw new Error('확대 방식을 다시 선택해 주세요.');result.upscale=data.upscale;}
  if(result.upscale==='ai'&&result.resolution==='480p')throw new Error('AI 보정은 720p 또는 1080p로 선택해 주세요.');
  if(result.upscale==='ai'&&result.durationSeconds>VIDEO_AI_MAX_SECONDS)throw new Error(`AI 보정은 ${VIDEO_AI_MAX_SECONDS}초 이하 영상에서만 사용할 수 있어요.`);
+ if(data.model!==undefined){if(data.model!=='h3'&&data.model!=='fasth3')throw new Error('영상 모델을 다시 선택해 주세요.');if(data.model==='fasth3'){if(result.upscale==='ai')throw new Error('FastH3는 빠른 확대만 지원해요. AI 보정은 완성 후 추가할 수 있어요.');result.model='fasth3';}}
  if(data.sourceJobId!==undefined){if(typeof data.sourceJobId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.sourceJobId)||result.upscale!=='ai')throw new Error('보정할 원본 영상 작업을 확인해 주세요.');result.sourceJobId=data.sourceJobId;}
  if(result.mode==='image'){
   if(typeof data.referenceId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.referenceId))throw new Error('참조 이미지를 먼저 선택해 주세요.');
