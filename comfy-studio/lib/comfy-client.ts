@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { translatePrompt } from './translate-prompt.ts';
+import { withImageRealism } from './realism.ts';
 import { compileZImageEdit,loadZImageEdit } from './z-image-edit.ts';
 import { getPreset, listPresetDefinitions } from './presets.ts';
 import { compileWorkflow, loadWorkflow } from './workflow.ts';
@@ -45,7 +46,8 @@ async function submit(input:GenerationInput,id:string) {
   try{
     const englishPrompt=await translatePrompt(input.prompt);
     const filename=input.referenceId?await uploadReference(input.referenceId):undefined;
-    prompt=await prepared({...input,prompt:englishPrompt},undefined,filename);
+    // Edit prompts are instructions about an existing image, so only fresh generations get realism cues.
+    prompt=await prepared({...input,prompt:getPreset(input.modelId).mode==='generate'?withImageRealism(englishPrompt):englishPrompt},undefined,filename);
   }
   catch(error){throw new PreparationError(error instanceof ServiceError?error.message:'생성 준비를 완료하지 못했습니다. 참조 이미지와 모델 상태를 확인한 뒤 다시 시도해 주세요.');}
   const data=await (await request('/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,client_id:id,extra_data:{comfy_studio_job_id:id}})})).json();
