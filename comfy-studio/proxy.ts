@@ -12,4 +12,4 @@ export function proxy(request: NextRequest) {
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }
-export const config = { matcher: ['/((?!_next/static|favicon.ico).*)'] };
+export const config = { matcher: ['/((?!_next/static|favicon.ico|api/swaps/sources).*)'] };
