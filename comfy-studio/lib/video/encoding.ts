@@ -22,7 +22,8 @@ export function createVideoEncoder(overrides:{directory?:string;fetch?:typeof fe
 const encoder=createVideoEncoder();
 export function createVideoFinalizer(output:Pick<typeof encoder,'encode'>){return async(job:VideoJobRecord):Promise<VideoMedia>=>{
  if(!job.sourceOutput)throw new ServiceError('원본 영상을 찾을 수 없습니다.');
- const fast=recordVideoUpscale(job)==='fast',later=!!job.input.sourceJobId;
+ // Singularity's two-stage graph already saves 1280x720, so only 1080p needs encoding.
+ const fast=recordVideoUpscale(job)==='fast'&&job.input.model!=='singularity',later=!!job.input.sourceJobId;
  if(later&&!job.originalOutput)throw new ServiceError('오디오를 보존할 원본 영상을 찾을 수 없습니다.');
  if(job.input.resolution==='1080p'||(fast&&job.input.resolution==='720p')||later)return output.encode(job.id,job.sourceOutput,{resolution:job.input.resolution,copyVideo:later&&job.input.resolution==='720p',...(later?{audioSource:job.originalOutput}:{} )});
  return {kind:'comfy',ref:safeVideoOutput(job.sourceOutput)};
