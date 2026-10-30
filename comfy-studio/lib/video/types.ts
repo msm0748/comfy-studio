@@ -2,7 +2,7 @@ export type VideoMode='text'|'image';
 export type VideoResolution='480p'|'720p'|'1080p';
 export type VideoUpscale='fast'|'ai';
 // Absent model means MiniMax H3 so stored jobs keep their meaning.
-export type VideoModel='h3'|'fasth3';
+export type VideoModel='h3'|'fasth3'|'singularity';
 export type VideoInput={mode:VideoMode;prompt:string;resolution:VideoResolution;durationSeconds:number;referenceId?:string;upscale?:VideoUpscale;sourceJobId?:string;model?:VideoModel};
 export type VideoOutputRef={filename:string;subfolder:string;type:'output'};
 export type VideoMedia={kind:'comfy';ref:VideoOutputRef}|{kind:'local';filename:string};

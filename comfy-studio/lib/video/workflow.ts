@@ -1,13 +1,20 @@
 import {readFile} from 'node:fs/promises';import path from 'node:path';import {randomInt} from 'node:crypto';
 import {compileStoredGraph} from '../stored-workflow.ts';import {validateGraphModels} from '../jobs.ts';
 import type {ApiGraph,NodeInfo} from '../types.ts';import type {VideoInput,VideoMode,VideoModel} from './types.ts';
-import {videoFrames} from './presets.ts';import {validateVideoInput} from './validation.ts';
-const FILES:Record<VideoModel,Record<VideoMode,string>>={h3:{text:'MiniMax-H3-T2V-7s-Single-Shot.json',image:'MiniMax-H3-I2V-7s-RTX3090.json'},fasth3:{text:'FastH3-T2V-8step.json',image:'FastH3-I2V-8step.json'}};
+import {VIDEO_HEIGHT,VIDEO_WIDTH,videoFrames} from './presets.ts';import {validateVideoInput} from './validation.ts';
+const FILES:Record<Exclude<VideoModel,'singularity'>,Record<VideoMode,string>>={h3:{text:'MiniMax-H3-T2V-7s-Single-Shot.json',image:'MiniMax-H3-I2V-7s-RTX3090.json'},fasth3:{text:'FastH3-T2V-8step.json',image:'FastH3-I2V-8step.json'}};
 export const FASTH3_UNET='fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors';
-export async function loadVideoWorkflow(mode:VideoMode,model:VideoModel='h3'):Promise<unknown>{const root=process.env.COMFYUI_WORKFLOW_DIR||'C:/ComfyUI/ComfyUI_windows_portable/ComfyUI/user/default/workflows';return JSON.parse((await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root,FILES[model][mode]),'utf8')).replace(/^\uFEFF/,''));}
+export const SINGULARITY_UNET='Minimax-h3_Singularity_ref2va_v2_pruned_int8.safetensors';
+const SINGULARITY_LORA='minimax_h3_ref2v_lightx2v_turbo_4step_v0.1_resized_avg_rank_20_bf16.safetensors';
+// Beta schedule (8 steps, shift 12) with one extra step below sigma 0.7, split after step 4; values from the 2026-10-30 tests.
+const SINGULARITY_SIGMAS={base:'1.000000, 0.994988, 0.982512, 0.960745, 0.923360',refine:'0.923360, 0.855292, 0.720733, 0.424908, 0.212454, 0.000000'};
+const LATENT_UPSCALER='minimax_h3_latent_upscaler_3d_conv_v1\\minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors';
+// Singularity generates at 864x480, upscales the latent and resamples at 1280x736, so it has no stored template.
+export async function loadVideoWorkflow(mode:VideoMode,model:VideoModel='h3'):Promise<unknown>{if(model==='singularity')return null;const root=process.env.COMFYUI_WORKFLOW_DIR||'C:/ComfyUI/ComfyUI_windows_portable/ComfyUI/user/default/workflows';return JSON.parse((await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root,FILES[model][mode]),'utf8')).replace(/^\uFEFF/,''));}
 export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,referenceFilename?:string):ApiGraph{
  validateVideoInput(input);
  if(input.mode==='image'&&referenceFilename!==`ComfyStudio/references/${input.referenceId}.png`)throw new Error('안전한 영상 참조 이미지를 확인해 주세요.');
+ if(input.model==='singularity'){const graph=compileSingularity(input,referenceFilename);validateVideoGraph(graph,info);return graph;}
  // FastH3's official template lists only linked widget inputs, so strict matching cannot apply; patchFastH3 pins the values that matter.
  const graph=compileStoredGraph(raw,info,{outputTypes:['SaveVideo'],strictSchema:input.model!=='fasth3',patch:({type,inputs})=>{
   if(type==='MiniMaxH3ImageToVideo')Object.assign(inputs,{prompt:input.prompt,width:864,height:480,length:videoFrames(input.durationSeconds)});
@@ -28,8 +35,7 @@ export function compileVideoWorkflow(raw:unknown,input:VideoInput,info:NodeInfo,
   const nativeVideo=add('studio_original_video','CreateVideo',{...video.inputs,images:nativeDecode});
   const [,save]=one('SaveVideo');add('studio_original_save','SaveVideo',{...save.inputs,video:nativeVideo,filename_prefix:'ComfyStudio/video/original'});
   const split=add('studio_split','LTXVSeparateAVLatent',{av_latent:original});
-  const modelName='minimax_h3_latent_upscaler_3d_conv_v1\\minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors';
-  const up=add('studio_up','MinimaxH3LatentUpscaler3D',{latent:split,model_name:modelName,mode:'target dimensions','mode.width':1280,'mode.height':736,align:32,enable_temporal_chunking:true,force_unload:true,device:'cuda',precision:'bf16'});
+  const up=add('studio_up','MinimaxH3LatentUpscaler3D',{latent:split,model_name:LATENT_UPSCALER,mode:'target dimensions','mode.width':1280,'mode.height':736,align:32,enable_temporal_chunking:true,force_unload:true,device:'cuda',precision:'bf16'});
   const av=add('studio_av','LTXVConcatAVLatent',{video_latent:up,audio_latent:['studio_split',1]});
   const sigmas=add('studio_sigmas','BasicScheduler',{model:guider.inputs.model,scheduler:'simple',steps:6,denoise:0.3});
   const temporal=add('studio_temporal','MMH3TemporalSplitParamsV10',{chunk_frames:73,temporal_overlap_frames:22,anchor_strength:0.999,motion_anchor_frames:'22',identity_anchor_frames:24});
@@ -71,9 +77,45 @@ function patchFastH3(graph:ApiGraph):void{
  for(const [key,node] of Object.entries(graph))if(node.class_type==='BlockSparseAttention'){for(const other of Object.values(graph))for(const [name,value] of Object.entries(other.inputs))if(Array.isArray(value)&&value[0]===key)other.inputs[name]=node.inputs.model;delete graph[key];}
  if(!Object.values(graph).some(n=>n.class_type==='UNETLoader'&&n.inputs.unet_name===FASTH3_UNET))throw new Error('FastH3 워크플로 구조를 확인해 주세요.');
 }
+function compileSingularity(input:VideoInput,referenceFilename?:string):ApiGraph{
+ const frames=videoFrames(input.durationSeconds);
+ // First-frame conditioning is tied to the latent size, so each pass gets its own at that pass's resolution.
+ // MiniMaxH3ImageToVideo stretches first_frame to fit, so the photo is center-cropped to the pass's aspect first.
+ const condition=(frame:string,width:number,height:number)=>({clip:['clip',0],vae:['video_vae',0],prompt:input.prompt,width,height,length:frames,...(input.mode==='image'?{first_frame:[frame,0]}:{})});
+ const node=(class_type:string,inputs:Record<string,unknown>)=>({class_type,inputs});
+ const scaled=(width:number,height:number)=>node('ImageScale',{image:['image',0],upscale_method:'lanczos',width,height,crop:'center'});
+ return {
+  unet:node('UNETLoader',{unet_name:SINGULARITY_UNET,weight_dtype:'default'}),
+  attention:node('ModelAttentionBackend',{model:['unet',0],attention:'comfy kitchen attention'}),
+  shift:node('MiniMaxH3SigmaShift',{model:['attention',0],shift_video:12,shift_audio:3}),
+  lora:node('LoraLoaderModelOnly',{model:['shift',0],lora_name:SINGULARITY_LORA,strength_model:1}),
+  clip:node('CLIPLoader',{clip_name:'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',type:'minimax',device:'default'}),
+  video_vae:node('VAELoader',{vae_name:'minimax_h3_video_vae_fp16.safetensors'}),
+  audio_vae:node('VAELoader',{vae_name:'minimax_h3_audio_vae_fp32.safetensors'}),
+  ...(input.mode==='image'?{image:node('LoadImage',{image:referenceFilename}),base_frame:scaled(VIDEO_WIDTH,VIDEO_HEIGHT),refine_frame:scaled(1280,736)}:{}),
+  noise:node('RandomNoise',{noise_seed:randomInt(0,2**48-1)}),
+  sampler:node('KSamplerSelect',{sampler_name:'euler'}),
+  base_sigmas:node('ManualSigmas',{sigmas:SINGULARITY_SIGMAS.base}),
+  refine_sigmas:node('ManualSigmas',{sigmas:SINGULARITY_SIGMAS.refine}),
+  base_condition:node('MiniMaxH3ImageToVideo',condition('base_frame',VIDEO_WIDTH,VIDEO_HEIGHT)),
+  base_guider:node('BasicGuider',{model:['lora',0],conditioning:['base_condition',0]}),
+  base:node('SamplerCustomAdvanced',{noise:['noise',0],guider:['base_guider',0],sampler:['sampler',0],sigmas:['base_sigmas',0],latent_image:['base_condition',1]}),
+  split:node('LTXVSeparateAVLatent',{av_latent:['base',1]}),
+  upscale:node('MinimaxH3LatentUpscaler3D',{latent:['split',0],model_name:LATENT_UPSCALER,mode:'target dimensions','mode.width':1280,'mode.height':736,align:32,enable_temporal_chunking:true,force_unload:true,device:'cuda',precision:'fp16'}),
+  upscaled:node('LTXVConcatAVLatent',{video_latent:['upscale',0],audio_latent:['split',1]}),
+  refine_condition:node('MiniMaxH3ImageToVideo',condition('refine_frame',1280,736)),
+  refine_guider:node('BasicGuider',{model:['lora',0],conditioning:['refine_condition',0]}),
+  refine:node('SamplerCustomAdvanced',{noise:['noise',0],guider:['refine_guider',0],sampler:['sampler',0],sigmas:['refine_sigmas',0],latent_image:['upscaled',0]}),
+  decode:node('VAEDecode',{samples:['refine',0],vae:['video_vae',0]}),
+  crop:node('ImageCrop',{image:['decode',0],width:1280,height:720,x:0,y:8}),
+  audio:node('VAEDecodeAudio',{samples:['refine',0],vae:['audio_vae',0]}),
+  video:node('CreateVideo',{images:['crop',0],audio:['audio',0],fps:24}),
+  save:node('SaveVideo',{video:['video',0],filename_prefix:'ComfyStudio/video/singularity',format:'mp4','format.codec':'h264','format.codec.encoding':'auto'}),
+ };
+}
 export function validateVideoGraph(graph:ApiGraph,info:NodeInfo):void{
  validateGraphModels(graph,info);
- const allowed={unet_name:['minimax_h3_fl2va_pruned_int8_convrot.safetensors',FASTH3_UNET],clip_name:['qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors'],vae_name:['minimax_h3_video_vae_int8_convrot.safetensors','minimax_h3_video_vae_fp16.safetensors','minimax_h3_audio_vae_fp32.safetensors']};
+ const allowed={unet_name:['minimax_h3_fl2va_pruned_int8_convrot.safetensors',FASTH3_UNET,SINGULARITY_UNET],clip_name:['qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors'],vae_name:['minimax_h3_video_vae_int8_convrot.safetensors','minimax_h3_video_vae_fp16.safetensors','minimax_h3_audio_vae_fp32.safetensors']};
  for(const node of Object.values(graph)){
   for(const [key,values] of Object.entries(allowed))if(key in node.inputs&&!values.includes(String(node.inputs[key])))throw new Error('승인되지 않은 영상 모델입니다.');
   if(node.class_type==='MinimaxH3LatentUpscaler3D'){

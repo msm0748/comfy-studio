@@ -26,6 +26,7 @@ description: ComfyUI 작업(이미지·영상·오디오 생성, 워크플로 �
 - FastH3 (MiniMax H3 8스텝 증류, FastVideo): MiniMax H3 Community License 승계. H3 파생 모델이라 기존 H3 허가 범위에 포함되는지 사용자 확인 후 사용.
 - H3 Character Swap LoRA V1.5 (akatz-ai): MiniMax H3 Community License 승계. FastH3와 같이 H3 허가 범위 확인 필요. 스튜디오 인물 교체 기능에서 사용하며 화면에 '상업 이용 확인 필요'로 표시.
 - SAM 3.1 (인물 교체의 사람 인식용): Meta SAM License. 상업 조건은 원문 확인 필요.
+- H3 Singularity V2 (WarmBloodAban, MiniMax H3 파인튜닝): HF 표기는 Apache-2.0이나 MiniMax H3 파생 모델 (2026-10-30 확인). 기존 H3 허가 범위에 포함되는지 사용자 확인 후 상업 이용. v2 pruned int8 설치, 스튜디오 영상 생성에서 사용하며 화면에 '상업 이용 확인 필요'로 표시.
 - LTX-2.5: LTX-2.x Community License, 연 매출 $10M 미만 상업 가능 (보도 기준). 라이선스 원문 확인 후 사용.
 
 ## 금지 (상업적 사용 불가)

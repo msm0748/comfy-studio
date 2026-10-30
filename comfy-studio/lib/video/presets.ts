@@ -1,5 +1,6 @@
-import type {VideoPreset,VideoResolution,VideoUpscale} from './types.ts';
+import type {VideoModel,VideoPreset,VideoResolution,VideoUpscale} from './types.ts';
 export const VIDEO_WIDTH=864,VIDEO_HEIGHT=480,VIDEO_FPS=24;
+export const VIDEO_MODEL_LABELS:Record<VideoModel,string>={h3:'MiniMax H3',fasth3:'FastH3',singularity:'Singularity V2'};
 export const VIDEO_PRESETS:readonly VideoPreset[]=[
  {id:'480p',label:'480p',width:864,height:480,maxSeconds:10,description:'빠른 원본 영상'},
  {id:'720p',label:'720p HD',width:1280,height:720,maxSeconds:10,description:'HD 출력 · 추천'},
