@@ -3,7 +3,9 @@ export type VideoResolution='480p'|'720p'|'1080p';
 export type VideoUpscale='fast'|'ai';
 // New jobs always use Singularity. Absent model means MiniMax H3 so stored jobs keep their meaning.
 export type VideoModel='h3'|'fasth3'|'singularity';
-export type VideoInput={mode:VideoMode;prompt:string;resolution:VideoResolution;durationSeconds:number;referenceId?:string;upscale?:VideoUpscale;sourceJobId?:string;model?:VideoModel};
+// Absent aspect means landscape so stored jobs keep their meaning.
+export type VideoAspect='landscape'|'portrait';
+export type VideoInput={mode:VideoMode;prompt:string;resolution:VideoResolution;durationSeconds:number;referenceId?:string;upscale?:VideoUpscale;sourceJobId?:string;model?:VideoModel;aspect?:VideoAspect};
 export type VideoOutputRef={filename:string;subfolder:string;type:'output'};
 export type VideoMedia={kind:'comfy';ref:VideoOutputRef}|{kind:'local';filename:string};
 export type VideoPreset={id:VideoResolution;label:string;width:number;height:number;maxSeconds:number;description:string};

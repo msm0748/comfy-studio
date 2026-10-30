@@ -1,5 +1,5 @@
 import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';import path from 'node:path';import {randomUUID} from 'node:crypto';
-import {assertJobId,ServiceError,PreparationError} from '../jobs.ts';import {getVideoPreset,videoFrames} from './presets.ts';import {validateVideoInput} from './validation.ts';
+import {assertJobId,ServiceError,PreparationError} from '../jobs.ts';import {videoFrames,videoLayout,videoOutputSize} from './presets.ts';import {validateVideoInput} from './validation.ts';
 import type {VideoInput,VideoJobRecord,VideoInspection,VideoOutputRef,VideoMedia} from './types.ts';
 export function safeVideoOutput(raw:unknown):VideoOutputRef{
  const r=raw as VideoOutputRef;const folder=typeof r?.subfolder==='string'?r.subfolder.replace(/\\/g,'/'):null;
@@ -37,9 +37,9 @@ export function createVideoJobService(deps:Deps){
    const next={...job,state:'processing' as const,phase:'encoding' as const,error:undefined};await save(next);finalize(next);return next;
   });},
   async submit(raw:VideoInput,id:string):Promise<VideoJobRecord>{const parsed=validateVideoInput(raw),input={...parsed,upscale:parsed.upscale??'fast' as const};return locked(id,async()=>{
-   await mkdir(deps.directory,{recursive:true});const preset=getVideoPreset(input.resolution),frames=videoFrames(input.durationSeconds);
-   let job:VideoJobRecord={id,promptId:null,input,createdAt:new Date().toISOString(),state:'submitting',phase:'generation',generationWidth:864,generationHeight:480,width:preset.width,height:preset.height,frames,fps:24,actualDurationSeconds:frames/24};
-   try{await writeFile(location(id),JSON.stringify(job),{flag:'wx'});}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;const existing=await read(id);const legacy=existing.input.upscale??(existing.input.resolution==='480p'?'fast':'ai');const same=(value:VideoInput,upscale:string)=>JSON.stringify([value.mode,value.prompt,value.resolution,value.durationSeconds,value.referenceId,upscale]);if(same(existing.input,legacy)!==same(input,raw.upscale??(existing.input.upscale===undefined?legacy:'fast')))throw new ServiceError('같은 작업 번호로 다른 영상을 요청할 수 없습니다.',409);return existing;}
+   await mkdir(deps.directory,{recursive:true});const output=videoOutputSize(input.resolution,input.aspect),{base}=videoLayout(input.aspect),frames=videoFrames(input.durationSeconds);
+   let job:VideoJobRecord={id,promptId:null,input,createdAt:new Date().toISOString(),state:'submitting',phase:'generation',generationWidth:base.width,generationHeight:base.height,width:output.width,height:output.height,frames,fps:24,actualDurationSeconds:frames/24};
+   try{await writeFile(location(id),JSON.stringify(job),{flag:'wx'});}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;const existing=await read(id);const legacy=existing.input.upscale??(existing.input.resolution==='480p'?'fast':'ai');const same=(value:VideoInput,upscale:string)=>JSON.stringify([value.mode,value.prompt,value.resolution,value.durationSeconds,value.referenceId,value.aspect,upscale]);if(same(existing.input,legacy)!==same(input,raw.upscale??(existing.input.upscale===undefined?legacy:'fast')))throw new ServiceError('같은 작업 번호로 다른 영상을 요청할 수 없습니다.',409);return existing;}
    try{job={...job,promptId:await deps.submit(input,id),state:'queued'};}catch(error){const rejected=error instanceof PreparationError||(error instanceof ServiceError&&error.status>=400&&error.status<500);job={...job,state:rejected?'failed':'submitting',error:rejected&&error instanceof ServiceError?error.message:'영상 요청의 접수 상태를 확인하고 있습니다.'};}
    await save(job);return job;
   });},
