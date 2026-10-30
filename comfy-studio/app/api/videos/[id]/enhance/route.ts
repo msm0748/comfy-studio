@@ -1,2 +1,0 @@
-import {requireAuth} from '@/lib/require-auth';import {apiError} from '@/lib/api';import {enhanceVideo} from '@/lib/video/service';import {handleVideoEnhancePost} from '@/lib/video/api';
-export async function POST(request:Request,context:{params:Promise<{id:string}>}){try{const {id}=await context.params;return Response.json(await handleVideoEnhancePost(request,id,{authorize:requireAuth,submit:enhanceVideo}),{status:202,headers:{'Cache-Control':'no-store'}});}catch(error){return apiError(error);}}

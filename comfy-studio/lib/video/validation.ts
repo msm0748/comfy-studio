@@ -1,20 +1,18 @@
-import {getVideoPreset,VIDEO_AI_MAX_SECONDS} from './presets.ts';
+import {getVideoPreset} from './presets.ts';
 import type {VideoInput,VideoMode,VideoResolution} from './types.ts';
 export function videoInputIssue(input:VideoInput):string|null{try{validateVideoInput(input);return null;}catch(error){return error instanceof Error?error.message:'영상 설정을 확인해 주세요.';}}
 export function validateVideoInput(raw:unknown):VideoInput{
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('영상 입력을 확인해 주세요.');
  const data=raw as Record<string,unknown>;
- if(Object.keys(data).some(k=>!['mode','prompt','resolution','durationSeconds','referenceId','upscale','sourceJobId','model'].includes(k)))throw new Error('지원하지 않는 영상 설정입니다.');
+ if(Object.keys(data).some(k=>!['mode','prompt','resolution','durationSeconds','referenceId','upscale','model'].includes(k)))throw new Error('지원하지 않는 영상 설정입니다.');
  if(!['text','image'].includes(String(data.mode)))throw new Error('영상 생성 방식을 다시 선택해 주세요.');
  if(typeof data.prompt!=='string'||!data.prompt.trim()||data.prompt.trim().length>8000)throw new Error('프롬프트는 1~8,000자로 입력해 주세요.');
  const preset=getVideoPreset(data.resolution as VideoResolution);
  if(typeof data.durationSeconds!=='number'||!Number.isInteger(data.durationSeconds)||data.durationSeconds<5||data.durationSeconds>preset.maxSeconds)throw new Error(`이 해상도의 영상 길이는 5~${preset.maxSeconds}초 사이로 선택해 주세요.`);
- const result:VideoInput={mode:data.mode as VideoMode,prompt:data.prompt.trim(),resolution:preset.id,durationSeconds:data.durationSeconds};
- if(data.upscale!==undefined){if(data.upscale!=='fast'&&data.upscale!=='ai')throw new Error('확대 방식을 다시 선택해 주세요.');result.upscale=data.upscale;}
- if(result.upscale==='ai'&&result.resolution==='480p')throw new Error('AI 보정은 720p 또는 1080p로 선택해 주세요.');
- if(result.upscale==='ai'&&result.durationSeconds>VIDEO_AI_MAX_SECONDS)throw new Error(`AI 보정은 ${VIDEO_AI_MAX_SECONDS}초 이하 영상에서만 사용할 수 있어요.`);
- if(data.model!==undefined){if(data.model!=='h3'&&data.model!=='fasth3'&&data.model!=='singularity')throw new Error('영상 모델을 다시 선택해 주세요.');if(data.model==='fasth3'){if(result.upscale==='ai')throw new Error('FastH3는 빠른 확대만 지원해요. AI 보정은 완성 후 추가할 수 있어요.');result.model='fasth3';}if(data.model==='singularity'){if(result.upscale==='ai')throw new Error('Singularity V2는 AI 업스케일이 포함돼 있어 AI 보정을 따로 고를 수 없어요.');if(result.resolution==='480p')throw new Error('Singularity V2는 720p 또는 1080p로 선택해 주세요.');result.model='singularity';}}
- if(data.sourceJobId!==undefined){if(typeof data.sourceJobId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.sourceJobId)||result.upscale!=='ai')throw new Error('보정할 원본 영상 작업을 확인해 주세요.');result.sourceJobId=data.sourceJobId;}
+ if(data.model!==undefined&&data.model!=='singularity')throw new Error('영상 모델을 다시 선택해 주세요.');
+ if(data.upscale!==undefined&&data.upscale!=='fast')throw new Error('확대 방식을 다시 선택해 주세요.');
+ const result:VideoInput={mode:data.mode as VideoMode,prompt:data.prompt.trim(),resolution:preset.id,durationSeconds:data.durationSeconds,model:'singularity'};
+ if(data.upscale==='fast')result.upscale='fast';
  if(result.mode==='image'){
   if(typeof data.referenceId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.referenceId))throw new Error('참조 이미지를 먼저 선택해 주세요.');
   result.referenceId=data.referenceId;

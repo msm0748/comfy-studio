@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';import path from 'node:path';import {randomUUID} from 'node:crypto';
 import {createVideoJobService,normalizeVideoHistory,safeVideoOutput} from '../lib/video/jobs.ts';import {PreparationError} from '../lib/jobs.ts';
-const input={mode:'text' as const,prompt:'빨간 머그컵',resolution:'480p' as const,durationSeconds:7};
+const input={mode:'text' as const,prompt:'빨간 머그컵',resolution:'720p' as const,durationSeconds:7};
 const output={filename:'clip.mp4',subfolder:'ComfyStudio/video',type:'output' as const};
 await mkdir('.data/test-tmp',{recursive:true});
 test('video jobs preserve original settings across restart and never submit the same identity twice',async()=>{
@@ -8,7 +8,7 @@ test('video jobs preserve original settings across restart and never submit the 
  const deps={directory,submit:async()=>{sent++;return 'prompt';},inspect:async()=>({state:'completed' as const,output}),recover:async()=>null,finalize:async()=>({kind:'comfy' as const,ref:output})};
  try{const service=createVideoJobService(deps),id=randomUUID();const [a,b]=await Promise.all([service.submit(input,id),service.submit(input,id)]);assert.equal(a.promptId,b.promptId);assert.equal(sent,1);
   await assert.rejects(()=>service.submit({...input,durationSeconds:6},id),{status:409});
-  const restored=createVideoJobService(deps);let job=await restored.get(id);assert.deepEqual(job.input,{...input,upscale:'fast'});
+  const restored=createVideoJobService(deps);let job=await restored.get(id);assert.deepEqual(job.input,{...input,model:'singularity',upscale:'fast'});
   for(let n=0;n<10&&job.state!=='completed';n++){await new Promise(r=>setTimeout(r,5));job=await restored.get(id);}assert.equal(job.state,'completed');assert.equal(sent,1);assert.equal(job.frames,175);
  }finally{await rm(directory,{recursive:true,force:true});}
 });

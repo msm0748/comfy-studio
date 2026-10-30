@@ -15,7 +15,7 @@ test('fast 720p uses CPU Lanczos while later AI720 copies video and original aud
 test('finalization retains legacy AI behavior and routes new fast output or source audio explicitly',async()=>{
  const source={filename:'source.mp4',subfolder:'video',type:'output' as const},original={...source,filename:'original.mp4'};const calls:unknown[][]=[];
  const finish=createVideoFinalizer({encode:async(...args:unknown[])=>{calls.push(args);return {kind:'local' as const,filename:'output.mp4'};}});
- const base={...createPendingVideo({mode:'text',prompt:'x',durationSeconds:7,resolution:'720p'}),sourceOutput:source};
+ const pending=createPendingVideo({mode:'text',prompt:'x',durationSeconds:7,resolution:'720p'});const {model:_model,...legacyInput}=pending.input;void _model;const base={...pending,input:legacyInput,sourceOutput:source};
  assert.deepEqual(await finish(base),{kind:'comfy',ref:source});assert.equal(calls.length,0);
  await finish({...base,input:{...base.input,upscale:'fast'}});assert.equal((calls[0][2] as {resolution:string}).resolution,'720p');
  await finish({...base,input:{...base.input,upscale:'ai',sourceJobId:randomUUID()},originalOutput:original});assert.deepEqual((calls[1][2] as {audioSource:unknown}).audioSource,original);assert.equal((calls[1][2] as {copyVideo:boolean}).copyVideo,true);
