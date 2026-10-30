@@ -20,3 +20,9 @@ test('finalization retains legacy AI behavior and routes new fast output or sour
  await finish({...base,input:{...base.input,upscale:'fast'}});assert.equal((calls[0][2] as {resolution:string}).resolution,'720p');
  await finish({...base,input:{...base.input,upscale:'ai',sourceJobId:randomUUID()},originalOutput:original});assert.deepEqual((calls[1][2] as {audioSource:unknown}).audioSource,original);assert.equal((calls[1][2] as {copyVideo:boolean}).copyVideo,true);
 });
+
+test('portrait encoding scales to portrait size',async()=>{
+ await mkdir('.data/test-tmp',{recursive:true});const directory=await mkdtemp(path.resolve('.data/test-tmp/encode-'));
+ const encoder=createVideoEncoder({directory,fetch:async()=>new Response('source',{headers:{'content-type':'video/mp4'}}),run:async(_exe,args)=>{assert.match(args[args.indexOf('-vf')+1],/scale=1080:1920:.*crop=1080:1920/);await writeFile(args.at(-1)!,'encoded');}});
+ try{await encoder.encode(randomUUID(),{filename:'x.mp4',subfolder:'video',type:'output'},{resolution:'1080p',aspect:'portrait'});}finally{await rm(directory,{recursive:true,force:true});}
+});

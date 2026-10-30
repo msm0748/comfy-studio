@@ -19,3 +19,7 @@ test('every new video uses Singularity; removed models, 480p and AI refinement a
  assert.equal(validateVideoInput(input).model,'singularity');assert.equal(validateVideoInput({...input,model:'singularity',upscale:'fast'}).upscale,'fast');
  for(const patch of [{model:'h3'},{model:'fasth3'},{model:'other'},{resolution:'480p'},{upscale:'ai'},{upscale:'bad'},{sourceJobId:'11111111-1111-4111-8111-111111111111'}])assert.ok(videoInputIssue({...input,...patch} as never),JSON.stringify(patch));
 });
+test('aspect is optional, landscape stays absent and unknown values are refused',()=>{
+ assert.equal(validateVideoInput(input).aspect,undefined);assert.equal(validateVideoInput({...input,aspect:'landscape'}).aspect,undefined);assert.equal(validateVideoInput({...input,aspect:'portrait'}).aspect,'portrait');
+ assert.throws(()=>validateVideoInput({...input,aspect:'square'}));
+});

@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {compileVideoWorkflow,SINGULARITY_UNET} from '../lib/video/workflow.ts';import {videoOutputDescription} from '../lib/video/upscale.ts';import {createPendingVideo,videoFormInput} from '../lib/video/submission.ts';import {createVideoFinalizer} from '../lib/video/encoding.ts';
+import {compileVideoWorkflow,SINGULARITY_UNET} from '../lib/video/workflow.ts';import {videoOutputDescription} from '../lib/video/upscale.ts';import {createPendingVideo,videoFormInput} from '../lib/video/submission.ts';import {createVideoFinalizer} from '../lib/video/encoding.ts';import {videoAspectFor} from '../lib/video/presets.ts';
 import {videoSchema} from './video-schema.ts';import type {VideoJobRecord} from '../lib/video/types.ts';
 const schema=await videoSchema();
 const input={mode:'text' as const,prompt:'A mug',resolution:'720p' as const,durationSeconds:10};
@@ -35,6 +35,22 @@ test('finished videos skip re-encoding at 720p and encode 1080p',async()=>{
  const calls:string[]=[];const finalize=createVideoFinalizer({encode:async(_id,_source,o)=>{calls.push(String(o?.resolution));return {kind:'local',filename:'x.mp4'};}});
  assert.equal((await finalize(done('720p'))).kind,'comfy');assert.equal((await finalize(done('1080p'))).kind,'local');assert.deepEqual(calls,['1080p']);
  assert.match(videoOutputDescription(done('720p').input),/AI 업스케일 포함/);assert.match(videoOutputDescription(done('1080p').input),/Lanczos/);
+});
+test('portrait swaps both passes, the first-frame crop and the 720p crop, and sizes the job to match',()=>{
+ const filename=`ComfyStudio/references/${reference}.png`,portrait={...input,mode:'image' as const,referenceId:reference,aspect:'portrait' as const};
+ const graph=compileVideoWorkflow(portrait,schema,filename);
+ assert.deepEqual([graph.base_condition.inputs.width,graph.base_condition.inputs.height,graph.refine_condition.inputs.width,graph.refine_condition.inputs.height],[480,864,736,1280]);
+ assert.deepEqual([graph.base_frame.inputs.width,graph.base_frame.inputs.height,graph.refine_frame.inputs.width,graph.refine_frame.inputs.height],[480,864,736,1280]);
+ assert.deepEqual([graph.upscale.inputs['mode.width'],graph.upscale.inputs['mode.height']],[736,1280]);
+ assert.deepEqual([graph.crop.inputs.width,graph.crop.inputs.height,graph.crop.inputs.x,graph.crop.inputs.y],[720,1280,8,0]);
+ const job=createPendingVideo(portrait);assert.deepEqual([job.width,job.height,job.generationWidth,job.generationHeight],[720,1280,480,864]);
+ const full=createPendingVideo({...portrait,resolution:'1080p'});assert.deepEqual([full.width,full.height],[1080,1920]);
+ assert.deepEqual([videoAspectFor({width:1024,height:1536}),videoAspectFor({width:1536,height:1024}),videoAspectFor({width:800,height:800})],['portrait','landscape','landscape']);
+ assert.equal(videoFormInput(portrait).aspect,'portrait');assert.equal(createPendingVideo(input).width,1280);
+});
+test('portrait 1080p finishes through the encoder at portrait size',async()=>{
+ const calls:unknown[]=[];const finalize=createVideoFinalizer({encode:async(_id,_source,o)=>{calls.push(o?.aspect);return {kind:'local',filename:'x.mp4'};}});
+ const base=done('1080p');await finalize({...base,input:{...base.input,aspect:'portrait'}});await finalize(base);assert.deepEqual(calls,['portrait',undefined]);
 });
 test('a restored older job fills the form only with settings that still apply',()=>{
  assert.deepEqual(videoFormInput({mode:'image',prompt:'컵',resolution:'480p',durationSeconds:7,upscale:'ai',model:'fasth3',referenceId:reference,sourceJobId:reference}),{mode:'image',prompt:'컵',resolution:'720p',durationSeconds:7,referenceId:reference});
